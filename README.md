@@ -22,10 +22,10 @@ Code name: **volley**.
 Rust stable (see `rust-toolchain.toml`). On Linux GPUI needs Vulkan, X11/Wayland, xkbcommon and fontconfig.
 
 ```bash
-cargo build --release
+cargo run --release
 ```
 
-The binaries are `target/release/kestrel` (the app) and `target/release/kestrel-cli`.
+`cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrel-cli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds both into `target/release/`.
 
 ## Use
 

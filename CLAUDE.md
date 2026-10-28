@@ -15,7 +15,9 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 | `crates/volley-core` | Формат файлов, коллекция, окружения, переменные, отправка запросов, OAuth2, JS-скрипты, `report_error` |
 | `crates/volley-openapi` | OpenAPI 3 → коллекция: импорт и повторный синк без потери правок |
 | `crates/volley-cli` | `kestrel-cli`: запуск коллекций в терминале и CI, импорт и синк |
-| `crates/volley-app` | Приложение `kestrel` на GPUI |
+| `crates/volley-app` | Приложение `kestrel` на GPUI; пакет по умолчанию: `cargo run` запускает его |
+
+`cargo cli …` — алиас для `kestrel-cli` (`.cargo/config.toml`). `cargo build` и `cargo test` без `--workspace` трогают только приложение.
 
 В `volley-app`:
 - `appearance/` — дизайн-система: палитры, разворачивание в тему gpui-component, масштаб (`dp()`), шрифты, режим для слабовидящих;

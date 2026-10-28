@@ -1,6 +1,7 @@
 [workspace]
 resolver = "3"
 members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-cli", "crates/volley-app"]
+default-members = ["crates/volley-app"]
 
 [workspace.package]
 version = "0.1.0"
