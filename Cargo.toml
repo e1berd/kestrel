@@ -1,0 +1,45 @@
+[workspace]
+resolver = "3"
+members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-cli"]
+# default-members
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/volley-http/volley"
+rust-version = "1.88"
+
+[workspace.dependencies]
+volley-core = { path = "crates/volley-core" }
+volley-openapi = { path = "crates/volley-openapi" }
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+serde_yaml_ng = "0.10"
+indexmap = { version = "2", features = ["serde"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "sync", "fs", "net", "io-util"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli", "deflate", "multipart", "cookies", "socks"] }
+futures = "0.3"
+url = "2"
+percent-encoding = "2"
+base64 = "0.22"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+rand = "0.9"
+dotenvy = "0.15"
+clap = { version = "4", features = ["derive"] }
+dirs = "6"
+notify = "8"
+
+[profile.dev]
+# GPUI is slow unoptimised; our own code stays quick to build.
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+strip = true
+lto = "thin"
