@@ -1,0 +1,16 @@
+opencollection: 1.0.0
+
+info:
+  name: httpbin
+
+request:
+  headers:
+    - name: X-Client
+      value: Kestrel
+  variables:
+    - name: baseUrl
+      value: https://httpbin.org
+
+docs:
+  content: Requests against httpbin.org, to try Kestrel without a server of your own.
+  type: text/markdown

@@ -1,6 +1,3 @@
-//! Scripts before a request and after its response, and tests, in QuickJS with the API Bruno gives
-//! them (see `prelude.js`).
-
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, anyhow};
@@ -12,17 +9,13 @@ use serde_json::Value as Json;
 
 use crate::vars::Vars;
 
-const PRELUDE: &str = include_str!("prelude.js");
-/// A script that runs longer than this is stopped, so a stray `while (true)` cannot hang a send.
+const PRELUDE: [&str; 3] = [include_str!("prelude/runtime.js"), include_str!("prelude/expect.js"), include_str!("prelude/require.js")];
 const TIME_LIMIT: Duration = Duration::from_secs(30);
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Header {
     pub name: String,
     pub value: String,
 }
-
-/// `req` in a script.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReqState {
@@ -34,22 +27,17 @@ pub struct ReqState {
     pub auth_mode: String,
     pub timeout: u64,
 }
-
-/// `res` in a script.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResState {
     pub status: u16,
     pub status_text: String,
-    /// By lower-case name.
     pub headers: IndexMap<String, String>,
-    /// Parsed when it is JSON, else the text.
     pub body: Json,
     pub response_time: u64,
     pub url: String,
     pub size: usize,
 }
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ScriptState {
@@ -66,7 +54,6 @@ pub struct ScriptState {
     pub cwd: String,
     pub req: ReqState,
     pub res: Option<ResState>,
-    /// What the script changed with `bru.setEnvVar`.
     #[serde(default)]
     pub env_changed: Vars,
     #[serde(default)]
@@ -78,7 +65,6 @@ pub struct ScriptState {
     #[serde(default)]
     pub next_request: Option<String>,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TestResult {
     pub name: String,
@@ -86,43 +72,30 @@ pub struct TestResult {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
-
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LogLine {
     pub level: String,
     pub text: String,
 }
-
 #[derive(Debug, Clone)]
 pub struct ScriptRun {
     pub state: ScriptState,
     pub tests: Vec<TestResult>,
     pub logs: Vec<LogLine>,
-    /// The first script that threw, as `label: message`.
     pub error: Option<String>,
 }
-
 #[derive(Deserialize)]
 struct Finished {
     state: ScriptState,
     tests: Vec<TestResult>,
     logs: Vec<LogLine>,
 }
-
-/// Runs `scripts` (each `(label, code)`) one after the other on `state`; stops at the first that
-/// throws.
 pub fn run(scripts: &[(String, String)], state: ScriptState) -> ScriptRun {
     match run_inner(scripts, &state) {
         Ok(run) => run,
-        Err(error) => ScriptRun {
-            state,
-            tests: Vec::new(),
-            logs: Vec::new(),
-            error: Some(error.to_string()),
-        },
+        Err(error) => ScriptRun { state, tests: Vec::new(), logs: Vec::new(), error: Some(error.to_string()) },
     }
 }
-
 fn run_inner(scripts: &[(String, String)], state: &ScriptState) -> Result<ScriptRun> {
     let runtime = Runtime::new()?;
     let started = Instant::now();
@@ -134,7 +107,7 @@ fn run_inner(scripts: &[(String, String)], state: &ScriptState) -> Result<Script
     let finished: String = context.with(|ctx| -> Result<String> {
         install_natives(&ctx)?;
         ctx.globals().set("__state_json", state_json)?;
-        eval(&ctx, PRELUDE).map_err(|e| anyhow!("the script prelude failed: {e}"))?;
+        eval(&ctx, &PRELUDE.concat()).map_err(|e| anyhow!("the script prelude failed: {e}"))?;
         for (label, code) in scripts {
             if code.trim().is_empty() {
                 continue;
@@ -147,7 +120,7 @@ fn run_inner(scripts: &[(String, String)], state: &ScriptState) -> Result<Script
                 break;
             }
             while ctx.execute_pending_job() {}
-            let failed: Option<String> = ctx.globals().get("__failed").ok();
+            let failed: Option<String> = ctx.globals().get("__failed")?;
             if let Some(message) = failed {
                 error = Some(format!("{label}: {message}"));
                 break;
@@ -156,14 +129,8 @@ fn run_inner(scripts: &[(String, String)], state: &ScriptState) -> Result<Script
         Ok(ctx.eval::<String, _>("JSON.stringify({ state: __S, tests: __tests, logs: __logs })")?)
     })?;
     let finished: Finished = serde_json::from_str(&finished)?;
-    Ok(ScriptRun {
-        state: finished.state,
-        tests: finished.tests,
-        logs: finished.logs,
-        error,
-    })
+    Ok(ScriptRun { state: finished.state, tests: finished.tests, logs: finished.logs, error })
 }
-
 fn eval(ctx: &Ctx<'_>, code: &str) -> std::result::Result<(), String> {
     match ctx.eval::<(), _>(code) {
         Ok(()) => Ok(()),
@@ -171,109 +138,43 @@ fn eval(ctx: &Ctx<'_>, code: &str) -> std::result::Result<(), String> {
         Err(e) => Err(e.to_string()),
     }
 }
-
 fn exception_text(ctx: &Ctx<'_>) -> String {
     let caught = ctx.catch();
     if let Some(exception) = caught.as_exception() {
         let message = exception.message().unwrap_or_default();
-        return if message.is_empty() {
-            "the script threw".into()
-        } else {
-            message
-        };
+        return if message.is_empty() { "the script threw".into() } else { message };
     }
-    caught
-        .get::<rquickjs::Coerced<String>>()
-        .map(|s| s.0)
-        .unwrap_or_else(|_| "the script threw".into())
+    caught.get::<rquickjs::Coerced<String>>().map(|s| s.0).unwrap_or_else(|_| "the script threw".into())
 }
-
 fn install_natives(ctx: &Ctx<'_>) -> Result<()> {
     let globals = ctx.globals();
     globals.set(
         "__native_jwt_sign",
-        Function::new(
-            ctx.clone(),
-            |header: String, claims: String, key: String| jwt_sign(&header, &claims, &key),
-        )?,
+        Function::new(ctx.clone(), |header: String, claims: String, key: String| crate::jwt::sign_for_script(&header, &claims, &key))?,
     )?;
     globals.set(
         "__native_b64decode",
         Function::new(ctx.clone(), |text: String, url_safe: bool| {
             let cleaned: String = text.chars().filter(|c| !c.is_whitespace()).collect();
             let bytes = if url_safe {
-                base64::engine::general_purpose::URL_SAFE_NO_PAD
-                    .decode(cleaned.trim_end_matches('='))
+                base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(cleaned.trim_end_matches('='))
             } else {
                 base64::engine::general_purpose::STANDARD.decode(&cleaned)
             };
-            bytes
-                .map(|b| String::from_utf8_lossy(&b).to_string())
-                .unwrap_or_default()
+            bytes.map(|b| String::from_utf8_lossy(&b).to_string()).unwrap_or_default()
         })?,
     )?;
     globals.set(
         "__native_b64encode",
-        Function::new(ctx.clone(), |text: String| {
-            base64::engine::general_purpose::STANDARD.encode(text.as_bytes())
-        })?,
+        Function::new(ctx.clone(), |text: String| base64::engine::general_purpose::STANDARD.encode(text.as_bytes()))?,
     )?;
-    globals.set(
-        "__native_uuid",
-        Function::new(ctx.clone(), || uuid::Uuid::new_v4().to_string())?,
-    )?;
+    globals.set("__native_uuid", Function::new(ctx.clone(), || uuid::Uuid::new_v4().to_string())?)?;
     globals.set(
         "__native_sleep",
-        Function::new(ctx.clone(), |ms: f64| {
-            std::thread::sleep(Duration::from_millis(ms.clamp(0.0, 60_000.0) as u64))
-        })?,
+        Function::new(ctx.clone(), |ms: f64| std::thread::sleep(Duration::from_millis(ms.clamp(0.0, 60_000.0) as u64)))?,
     )?;
     Ok(())
 }
-
-/// `{"ok": token}` or `{"err": message}`, which the prelude turns into a return or a throw.
-fn jwt_sign(header: &str, claims: &str, key: &str) -> String {
-    let result = (|| -> Result<String> {
-        use jsonwebtoken::{Algorithm, EncodingKey};
-        let header_json: Json = serde_json::from_str(header)?;
-        let claims: Json = serde_json::from_str(claims)?;
-        let alg: Algorithm = header_json
-            .get("alg")
-            .and_then(Json::as_str)
-            .unwrap_or("HS256")
-            .parse()
-            .map_err(|_| anyhow!("unknown algorithm"))?;
-        let key = key.replace("\\n", "\n");
-        let encoding = match alg {
-            Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => {
-                EncodingKey::from_secret(key.as_bytes())
-            }
-            Algorithm::RS256
-            | Algorithm::RS384
-            | Algorithm::RS512
-            | Algorithm::PS256
-            | Algorithm::PS384
-            | Algorithm::PS512 => EncodingKey::from_rsa_pem(key.as_bytes())?,
-            Algorithm::ES256 | Algorithm::ES384 => EncodingKey::from_ec_pem(key.as_bytes())?,
-            Algorithm::EdDSA => EncodingKey::from_ed_pem(key.as_bytes())?,
-        };
-        let mut jwt_header = jsonwebtoken::Header::new(alg);
-        jwt_header.kid = header_json
-            .get("kid")
-            .and_then(Json::as_str)
-            .map(str::to_string);
-        jwt_header.typ = header_json
-            .get("typ")
-            .and_then(Json::as_str)
-            .map(str::to_string);
-        Ok(jsonwebtoken::encode(&jwt_header, &claims, &encoding)?)
-    })();
-    match result {
-        Ok(token) => serde_json::json!({ "ok": token }).to_string(),
-        Err(e) => serde_json::json!({ "err": format!("jwt.sign: {e}") }).to_string(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -306,10 +207,7 @@ mod tests {
         "#;
         let run = run(&[("before".into(), code.into())], state());
         assert_eq!(run.error, None);
-        assert_eq!(
-            run.state.runtime_vars["who"],
-            Json::String("dev:user-1".into())
-        );
+        assert_eq!(run.state.runtime_vars["who"], Json::String("dev:user-1".into()));
         assert_eq!(run.state.runtime_vars["n"], serde_json::json!(3));
         assert_eq!(run.state.req.headers[0].name, "X-Test");
         assert!(run.state.req.body.contains("\"b\": 2"));
@@ -319,11 +217,7 @@ mod tests {
     #[test]
     fn tests_pass_and_fail() {
         let mut state = state();
-        state.res = Some(ResState {
-            status: 201,
-            body: serde_json::json!({"state": "requested", "items": [1, 2]}),
-            ..Default::default()
-        });
+        state.res = Some(ResState { status: 201, body: serde_json::json!({"state": "requested", "items": [1, 2]}), ..Default::default() });
         let code = r#"
             test('status', () => expect(res.status).to.be.oneOf([200, 201]));
             test('state', () => expect(res.body.state).to.equal('requested'));
@@ -334,25 +228,13 @@ mod tests {
         let run = run(&[("tests".into(), code.into())], state);
         let passed: Vec<bool> = run.tests.iter().map(|t| t.passed).collect();
         assert_eq!(passed, vec![true, true, true, false, true]);
-        assert_eq!(
-            run.tests[3].error.as_deref(),
-            Some("expected 201 to equal 200")
-        );
+        assert_eq!(run.tests[3].error.as_deref(), Some("expected 201 to equal 200"));
     }
 
     #[test]
     fn a_throw_stops_and_says_why() {
-        let run = run(
-            &[(
-                "before-request".into(),
-                "throw new Error('No environment selected')".into(),
-            )],
-            state(),
-        );
-        assert_eq!(
-            run.error.as_deref(),
-            Some("before-request: No environment selected")
-        );
+        let run = run(&[("before-request".into(), "throw new Error('No environment selected')".into())], state());
+        assert_eq!(run.error.as_deref(), Some("before-request: No environment selected"));
     }
 
     #[test]

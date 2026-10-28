@@ -1,0 +1,6 @@
+name: public
+variables:
+  - name: baseUrl
+    value: https://httpbin.org
+  - name: user
+    value: kestrel

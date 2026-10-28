@@ -1,0 +1,23 @@
+info:
+  name: Basic auth
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/basic-auth/{{user}}/secret"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test('the folder signs it in', () => {
+          expect(res.body.authenticated).to.be.true;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

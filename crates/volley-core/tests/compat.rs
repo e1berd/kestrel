@@ -1,6 +1,3 @@
-//! Opens a collection Bruno wrote and checks that writing any of its files back changes nothing.
-//! Point `KESTREL_COMPAT_DIR` at one; without it the bundled example is checked.
-
 use std::path::PathBuf;
 
 use volley_core::{Collection, Item};
@@ -52,18 +49,9 @@ fn every_file_writes_back_as_it_was() {
         }
     }
     walk(&collection.items, &mut check);
-    assert!(
-        differ.is_empty(),
-        "{} of {checked} files would change:\n{}",
-        differ.len(),
-        differ.join("\n")
-    );
+    assert!(differ.is_empty(), "{} of {checked} files would change:\n{}", differ.len(), differ.join("\n"));
     assert!(checked > 0);
     for request in collection.requests() {
-        assert!(
-            !request.doc.is_dirty(),
-            "{} reads as changed",
-            request.doc.path.display()
-        );
+        assert!(!request.doc.is_dirty(), "{} reads as changed", request.doc.path.display());
     }
 }

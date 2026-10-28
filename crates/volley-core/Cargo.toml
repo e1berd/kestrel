@@ -22,6 +22,7 @@ chrono.workspace = true
 rand.workspace = true
 dotenvy.workspace = true
 rquickjs = "0.14"
-jsonwebtoken = "9.3"
+jsonwebtoken = { version = "11", default-features = false, features = ["use_pem", "rust_crypto"] }
 sha2 = "0.10"
 open = "5"
+dirs.workspace = true

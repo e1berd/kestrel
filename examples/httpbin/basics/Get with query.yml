@@ -1,0 +1,37 @@
+info:
+  name: Get with query
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{baseUrl}}/anything/:section"
+  params:
+    - name: section
+      value: books
+      type: path
+    - name: page
+      value: "2"
+      type: query
+    - name: sort
+      value: title
+      type: query
+      disabled: true
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test('answers 200', () => {
+          expect(res.status).to.equal(200);
+        });
+        test('sends the query', () => {
+          expect(res.body.args).to.eql({ page: '2' });
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

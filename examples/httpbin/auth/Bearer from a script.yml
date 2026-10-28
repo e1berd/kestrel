@@ -1,0 +1,31 @@
+info:
+  name: Bearer from a script
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{baseUrl}}/bearer"
+  auth:
+    type: bearer
+    token: "{{token}}"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const jwt = require('jsonwebtoken');
+        bru.setVar('token', jwt.sign({ sub: bru.getEnvVar('user') }, 'demo-secret', { expiresIn: '1h' }));
+    - type: tests
+      code: |-
+        test('the token went out', () => {
+          const jwt = require('jsonwebtoken');
+          expect(res.body.authenticated).to.be.true;
+          expect(jwt.decode(res.body.token).sub).to.equal('kestrel');
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

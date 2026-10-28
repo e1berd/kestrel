@@ -1,29 +1,19 @@
-//! YAML written the way Bruno writes it, so a request saved here shows in `git diff` only where it
-//! changed: two-space indents, list items indented under their key, double quotes only where a plain
-//! scalar would read back as something else, `|-` blocks for multi-line text and no line folding.
-
 use std::collections::HashSet;
 
 use serde_yaml_ng::{Mapping, Value};
 
-/// How a file lays out its top-level keys: which of them have an empty line before them.
 #[derive(Debug, Clone, Default)]
 pub struct Layout {
     spaced: HashSet<String>,
-    /// Whether a top-level key the file did not have before gets an empty line before it.
     pub space_new_keys: bool,
 }
 
 impl Layout {
-    /// The layout of an existing file, read from its text.
     pub fn of(text: &str, space_new_keys: bool) -> Self {
         let mut spaced = HashSet::new();
         let mut previous_blank = false;
         for line in text.lines() {
-            let starts_key = line
-                .chars()
-                .next()
-                .is_some_and(|c| !c.is_whitespace() && c != '#' && c != '-');
+            let starts_key = line.chars().next().is_some_and(|c| !c.is_whitespace() && c != '#' && c != '-');
             if starts_key && previous_blank {
                 if let Some((key, _)) = line.split_once(':') {
                     spaced.insert(key.trim_matches('"').to_string());
@@ -31,31 +21,18 @@ impl Layout {
             }
             previous_blank = line.trim().is_empty();
         }
-        Self {
-            spaced,
-            space_new_keys,
-        }
+        Self { spaced, space_new_keys }
     }
 
-    /// The layout of a file that is about to be written for the first time.
     pub fn fresh(space_keys: bool) -> Self {
-        Self {
-            spaced: HashSet::new(),
-            space_new_keys: space_keys,
-        }
+        Self { spaced: HashSet::new(), space_new_keys: space_keys }
     }
 
     fn spaced_before(&self, key: &str, known: bool) -> bool {
-        if known {
-            self.spaced.contains(key)
-        } else {
-            self.space_new_keys
-        }
+        if known { self.spaced.contains(key) } else { self.space_new_keys }
     }
 }
 
-/// `new` with the key order of `old` wherever they share keys, so an edit does not reorder a file.
-/// A number or a boolean that `new` holds as the same text stays as it was.
 pub fn merge(old: &Value, new: Value) -> Value {
     match (old, new) {
         (Value::Mapping(old), Value::Mapping(mut new)) => {
@@ -72,16 +49,9 @@ pub fn merge(old: &Value, new: Value) -> Value {
         }
         (Value::Sequence(old), Value::Sequence(new)) => {
             let empty = Value::Null;
-            Value::Sequence(
-                new.into_iter()
-                    .enumerate()
-                    .map(|(i, value)| merge(old.get(i).unwrap_or(&empty), value))
-                    .collect(),
-            )
+            Value::Sequence(new.into_iter().enumerate().map(|(i, value)| merge(old.get(i).unwrap_or(&empty), value)).collect())
         }
-        (old @ (Value::Number(_) | Value::Bool(_)), Value::String(text))
-            if scalar_text(old).as_deref() == Some(text.as_str()) =>
-        {
+        (old @ (Value::Number(_) | Value::Bool(_)), Value::String(text)) if scalar_text(old).as_deref() == Some(text.as_str()) => {
             old.clone()
         }
         (_, new) => new,
@@ -97,7 +67,6 @@ fn scalar_text(value: &Value) -> Option<String> {
     }
 }
 
-/// The text of a whole file.
 pub fn emit(doc: &Value, layout: &Layout, old_keys: &HashSet<String>) -> String {
     let mut out = String::new();
     match doc {
@@ -118,7 +87,6 @@ pub fn emit(doc: &Value, layout: &Layout, old_keys: &HashSet<String>) -> String 
     out
 }
 
-/// The top-level keys of a document, to tell old keys from new ones when laying it out.
 pub fn top_keys(doc: &Value) -> HashSet<String> {
     match doc {
         Value::Mapping(map) => map.keys().filter_map(scalar_text).collect(),
@@ -130,7 +98,6 @@ fn indent(out: &mut String, n: usize) {
     out.extend(std::iter::repeat_n(' ', n));
 }
 
-/// `key: value` at `level`, ending with a newline.
 fn emit_entry(out: &mut String, level: usize, key: &Value, value: &Value) {
     indent(out, level);
     out.push_str(&scalar(key));
@@ -138,8 +105,6 @@ fn emit_entry(out: &mut String, level: usize, key: &Value, value: &Value) {
     emit_after_colon(out, level, value);
 }
 
-/// What follows `key:` or `- ` — on the same line for scalars and empty collections, below it for
-/// the rest.
 fn emit_after_colon(out: &mut String, level: usize, value: &Value) {
     match value {
         Value::Mapping(map) if !map.is_empty() => {
@@ -175,7 +140,6 @@ fn emit_sequence(out: &mut String, level: usize, seq: &[Value]) {
         out.push('-');
         match item {
             Value::Mapping(map) if !map.is_empty() => {
-                // The first key shares the dash's line; the others line up under it.
                 for (i, (key, value)) in map.iter().enumerate() {
                     if i == 0 {
                         out.push(' ');
@@ -207,9 +171,7 @@ fn emit_value_inline(out: &mut String, _level: usize, value: &Value) {
 fn is_block(text: &str) -> bool {
     text.contains('\n')
         && !text.starts_with([' ', '\t'])
-        && !text
-            .chars()
-            .any(|c| c.is_control() && c != '\n' && c != '\t')
+        && !text.chars().any(|c| c.is_control() && c != '\n' && c != '\t')
         && !text.lines().any(|line| line.ends_with([' ', '\t']))
 }
 
@@ -221,11 +183,7 @@ fn emit_block(out: &mut String, level: usize, text: &str) {
         _ => "|+",
     });
     out.push('\n');
-    let body = if trailing == 0 {
-        text
-    } else {
-        &text[..text.len() - 1]
-    };
+    let body = if trailing == 0 { text } else { &text[..text.len() - 1] };
     for line in body.split('\n') {
         if !line.is_empty() {
             indent(out, level);
@@ -235,7 +193,6 @@ fn emit_block(out: &mut String, level: usize, text: &str) {
     }
 }
 
-/// A scalar on one line: plain when it reads back as the same string, else double-quoted.
 pub fn scalar(value: &Value) -> String {
     match value {
         Value::Null => "null".into(),
@@ -274,12 +231,8 @@ fn needs_quotes(s: &str) -> bool {
     looks_like_other_type(s)
 }
 
-/// Whether YAML's core schema reads `s` as a null, a boolean or a number.
 fn looks_like_other_type(s: &str) -> bool {
-    if matches!(
-        s,
-        "~" | "null" | "Null" | "NULL" | "true" | "True" | "TRUE" | "false" | "False" | "FALSE"
-    ) {
+    if matches!(s, "~" | "null" | "Null" | "NULL" | "true" | "True" | "TRUE" | "false" | "False" | "FALSE") {
         return true;
     }
     let lower = s.to_ascii_lowercase();
@@ -302,9 +255,7 @@ fn is_decimal(s: &str) -> bool {
         None => (s, None),
     };
     let digits = mantissa.replace('.', "");
-    let mantissa_ok = !digits.is_empty()
-        && digits.chars().all(|c| c.is_ascii_digit())
-        && mantissa.matches('.').count() <= 1;
+    let mantissa_ok = !digits.is_empty() && digits.chars().all(|c| c.is_ascii_digit()) && mantissa.matches('.').count() <= 1;
     let exponent_ok = exponent.is_none_or(|e| {
         let e = e.trim_start_matches(['-', '+']);
         !e.is_empty() && e.chars().all(|c| c.is_ascii_digit())
@@ -380,31 +331,16 @@ settings:
     fn quotes_only_what_would_change_type() {
         assert_eq!(scalar(&Value::String("1".into())), "\"1\"");
         assert_eq!(scalar(&Value::String("false".into())), "\"false\"");
-        assert_eq!(
-            scalar(&Value::String("http://127.0.0.1:8000".into())),
-            "http://127.0.0.1:8000"
-        );
-        assert_eq!(
-            scalar(&Value::String("Readiness: database".into())),
-            "\"Readiness: database\""
-        );
-        assert_eq!(
-            scalar(&Value::String("2026-10-28T13:18:01.774Z".into())),
-            "2026-10-28T13:18:01.774Z"
-        );
-        assert_eq!(
-            scalar(&Value::String("policy ('-' is default)".into())),
-            "policy ('-' is default)"
-        );
+        assert_eq!(scalar(&Value::String("http://127.0.0.1:8000".into())), "http://127.0.0.1:8000");
+        assert_eq!(scalar(&Value::String("Readiness: database".into())), "\"Readiness: database\"");
+        assert_eq!(scalar(&Value::String("2026-10-28T13:18:01.774Z".into())), "2026-10-28T13:18:01.774Z");
+        assert_eq!(scalar(&Value::String("policy ('-' is default)".into())), "policy ('-' is default)");
     }
 
     #[test]
     fn merge_keeps_the_old_order() {
         let old: Value = serde_yaml_ng::from_str("b: 1\na: 2\n").unwrap();
         let new: Value = serde_yaml_ng::from_str("a: 3\nb: 1\nc: 4\n").unwrap();
-        assert_eq!(
-            serde_yaml_ng::to_string(&merge(&old, new)).unwrap(),
-            "b: 1\na: 3\nc: 4\n"
-        );
+        assert_eq!(serde_yaml_ng::to_string(&merge(&old, new)).unwrap(), "b: 1\na: 3\nc: 4\n");
     }
 }

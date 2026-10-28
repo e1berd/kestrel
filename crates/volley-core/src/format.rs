@@ -1,9 +1,3 @@
-//! The files of an OpenCollection (the YAML format of Bruno 3): `opencollection.yml` at the root,
-//! `folder.yml` in each folder, one file per request and `environments/*.yml`.
-//!
-//! Every type keeps the keys it does not know in `extra`, so saving never drops what another tool
-//! wrote.
-
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_yaml_ng::Value;
@@ -14,17 +8,13 @@ fn is_false(b: &bool) -> bool {
     !*b
 }
 
-/// Strings that YAML may have read as numbers or booleans (`value: 5`).
 fn scalar_string<'de, D: Deserializer<'de>>(de: D) -> Result<String, D::Error> {
     Ok(match Value::deserialize(de)? {
         Value::Null => String::new(),
         Value::String(s) => s,
         Value::Bool(b) => b.to_string(),
         Value::Number(n) => n.to_string(),
-        other => serde_yaml_ng::to_string(&other)
-            .unwrap_or_default()
-            .trim_end()
-            .to_string(),
+        other => serde_yaml_ng::to_string(&other).unwrap_or_default().trim_end().to_string(),
     })
 }
 
@@ -42,14 +32,12 @@ pub struct Info {
     pub extra: Extra,
 }
 
-/// A header, a parameter or a variable.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct KeyValue {
     #[serde(default, deserialize_with = "scalar_string")]
     pub name: String,
     #[serde(default, deserialize_with = "scalar_string")]
     pub value: String,
-    /// `path` or `query` for parameters; `text` or `file` for multipart fields.
     #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
     #[serde(default, skip_serializing_if = "is_false")]
@@ -62,11 +50,7 @@ pub struct KeyValue {
 
 impl KeyValue {
     pub fn new(name: impl Into<String>, value: impl Into<String>) -> Self {
-        Self {
-            name: name.into(),
-            value: value.into(),
-            ..Default::default()
-        }
+        Self { name: name.into(), value: value.into(), ..Default::default() }
     }
 
     pub fn with_kind(mut self, kind: &str) -> Self {
@@ -79,16 +63,12 @@ impl KeyValue {
     }
 
     pub fn is_secret(&self) -> bool {
-        self.extra
-            .get("secret")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
+        self.extra.get("secret").and_then(Value::as_bool).unwrap_or(false)
     }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Body {
-    /// `none`, `json`, `text`, `xml`, `sparql`, `form-urlencoded`, `multipart-form` or `graphql`.
     #[serde(rename = "type")]
     pub kind: String,
     #[serde(default, skip_serializing_if = "Value::is_null")]
@@ -99,14 +79,9 @@ pub struct Body {
 
 impl Body {
     pub fn text(kind: &str, data: impl Into<String>) -> Self {
-        Self {
-            kind: kind.into(),
-            data: Value::String(data.into()),
-            extra: Extra::new(),
-        }
+        Self { kind: kind.into(), data: Value::String(data.into()), extra: Extra::new() }
     }
 
-    /// The text of a json, text, xml or sparql body.
     pub fn as_text(&self) -> String {
         match &self.data {
             Value::String(s) => s.clone(),
@@ -115,7 +90,6 @@ impl Body {
         }
     }
 
-    /// The fields of a form body.
     pub fn fields(&self) -> Vec<KeyValue> {
         serde_yaml_ng::from_value(self.data.clone()).unwrap_or_default()
     }
@@ -124,15 +98,8 @@ impl Body {
         self.data = serde_yaml_ng::to_value(fields).unwrap_or(Value::Null);
     }
 
-    /// `query` and `variables` of a GraphQL body.
     pub fn graphql(&self) -> (String, String) {
-        let get = |key: &str| {
-            self.data
-                .get(key)
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string()
-        };
+        let get = |key: &str| self.data.get(key).and_then(Value::as_str).unwrap_or_default().to_string();
         (get("query"), get("variables"))
     }
 
@@ -141,7 +108,6 @@ impl Body {
     }
 }
 
-/// `auth: inherit`, `auth: none`, or the settings of one scheme.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum Auth {
@@ -156,7 +122,6 @@ impl Default for Auth {
 }
 
 impl Auth {
-    /// `inherit`, `none`, `bearer`, `basic`, `apikey`, `oauth2`, …
     pub fn mode(&self) -> &str {
         match self {
             Auth::Mode(mode) => mode,
@@ -182,13 +147,9 @@ pub struct AuthConfig {
 
 impl AuthConfig {
     pub fn new(kind: &str) -> Self {
-        Self {
-            kind: kind.into(),
-            fields: Extra::new(),
-        }
+        Self { kind: kind.into(), fields: Extra::new() }
     }
 
-    /// A string at a dotted path such as `credentials.clientId`.
     pub fn str(&self, path: &str) -> String {
         let mut parts = path.split('.');
         let first = parts.next().unwrap_or_default();
@@ -219,7 +180,6 @@ impl AuthConfig {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Script {
-    /// `before-request`, `after-response` or `tests`.
     #[serde(rename = "type")]
     pub kind: String,
     #[serde(default)]
@@ -246,7 +206,6 @@ pub struct Http {
     pub extra: Extra,
 }
 
-/// What a folder or the collection sets for every request under it.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct Defaults {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -276,7 +235,6 @@ pub struct Runtime {
 pub struct Settings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encode_url: Option<bool>,
-    /// Milliseconds; 0 waits for as long as it takes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub timeout: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -289,17 +247,10 @@ pub struct Settings {
 
 impl Default for Settings {
     fn default() -> Self {
-        Self {
-            encode_url: Some(true),
-            timeout: Some(0),
-            follow_redirects: Some(true),
-            max_redirects: Some(5),
-            extra: Extra::new(),
-        }
+        Self { encode_url: Some(true), timeout: Some(0), follow_redirects: Some(true), max_redirects: Some(5), extra: Extra::new() }
     }
 }
 
-/// Free text, or `{ content, type }` with its media type.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum Docs {
@@ -320,7 +271,6 @@ impl Docs {
     }
 }
 
-/// One request file.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct RequestFile {
     #[serde(default)]
@@ -340,17 +290,8 @@ pub struct RequestFile {
 impl RequestFile {
     pub fn new_http(name: &str, method: &str, url: &str) -> Self {
         Self {
-            info: Info {
-                name: name.into(),
-                kind: "http".into(),
-                ..Default::default()
-            },
-            http: Some(Http {
-                method: method.into(),
-                url: url.into(),
-                auth: Some(Auth::default()),
-                ..Default::default()
-            }),
+            info: Info { name: name.into(), kind: "http".into(), ..Default::default() },
+            http: Some(Http { method: method.into(), url: url.into(), auth: Some(Auth::default()), ..Default::default() }),
             settings: Some(Settings::default()),
             ..Default::default()
         }
@@ -361,17 +302,11 @@ impl RequestFile {
     }
 
     pub fn scripts(&self) -> &[Script] {
-        self.runtime
-            .as_ref()
-            .map(|r| r.scripts.as_slice())
-            .unwrap_or_default()
+        self.runtime.as_ref().map(|r| r.scripts.as_slice()).unwrap_or_default()
     }
 
     pub fn variables(&self) -> &[KeyValue] {
-        self.runtime
-            .as_ref()
-            .map(|r| r.variables.as_slice())
-            .unwrap_or_default()
+        self.runtime.as_ref().map(|r| r.variables.as_slice()).unwrap_or_default()
     }
 
     pub fn settings(&self) -> Settings {
@@ -379,7 +314,6 @@ impl RequestFile {
     }
 }
 
-/// `folder.yml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct FolderFile {
     #[serde(default)]
@@ -392,7 +326,6 @@ pub struct FolderFile {
     pub extra: Extra,
 }
 
-/// `opencollection.yml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct CollectionFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -410,8 +343,6 @@ pub struct CollectionFile {
 }
 
 impl CollectionFile {
-    /// The OpenAPI specs this collection is generated from, as `(source, group_by)`. Read from
-    /// `extensions.volley.openapi` or, in a collection Bruno made, `extensions.bruno.openapi`.
     pub fn openapi_sources(&self) -> Vec<(String, String)> {
         let extensions = self.extra.get("extensions");
         ["volley", "bruno"]
@@ -420,17 +351,12 @@ impl CollectionFile {
             .flatten()
             .filter_map(|source| {
                 let url = source.get("sourceUrl")?.as_str()?.to_string();
-                let group_by = source
-                    .get("groupBy")
-                    .and_then(Value::as_str)
-                    .unwrap_or("tags")
-                    .to_string();
+                let group_by = source.get("groupBy").and_then(Value::as_str).unwrap_or("tags").to_string();
                 Some((url, group_by))
             })
             .collect()
     }
 
-    /// Folder and file names the collection asks to skip.
     pub fn ignored(&self) -> Vec<String> {
         let extensions = self.extra.get("extensions");
         ["volley", "bruno"]
@@ -442,7 +368,6 @@ impl CollectionFile {
     }
 }
 
-/// `environments/<name>.yml`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct EnvironmentFile {
     #[serde(default, deserialize_with = "scalar_string")]

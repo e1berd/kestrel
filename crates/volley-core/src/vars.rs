@@ -1,7 +1,3 @@
-//! `{{name}}` in URLs, headers and bodies, resolved the way Bruno resolves them: runtime variables
-//! over request, folder, environment and collection ones; `{{process.env.NAME}}` from `.env` and the
-//! process; `{{$randomUUID}}` and the other dynamic values.
-
 use indexmap::IndexMap;
 use rand::Rng;
 
@@ -11,23 +7,16 @@ pub type Vars = IndexMap<String, String>;
 pub struct Scope {
     pub collection: Vars,
     pub environment: Vars,
-    /// The folders from the outermost in.
     pub folders: Vec<Vars>,
     pub request: Vars,
-    /// Set by scripts while the app or a run lasts.
     pub runtime: Vars,
-    /// The collection's `.env` over the process's own environment.
     pub process_env: Vars,
 }
 
 impl Scope {
     pub fn get(&self, name: &str) -> Option<String> {
         if let Some(env_name) = name.strip_prefix("process.env.") {
-            return self
-                .process_env
-                .get(env_name)
-                .cloned()
-                .or_else(|| std::env::var(env_name).ok());
+            return self.process_env.get(env_name).cloned().or_else(|| std::env::var(env_name).ok());
         }
         if let Some(value) = dynamic(name) {
             return Some(value);
@@ -41,13 +30,9 @@ impl Scope {
             .cloned()
     }
 
-    /// Every variable a request can see, the nearest one winning, for showing in the app.
     pub fn all(&self) -> Vars {
         let mut out = Vars::new();
-        let layers = [&self.collection, &self.environment]
-            .into_iter()
-            .chain(self.folders.iter())
-            .chain([&self.request, &self.runtime]);
+        let layers = [&self.collection, &self.environment].into_iter().chain(self.folders.iter()).chain([&self.request, &self.runtime]);
         for layer in layers {
             for (k, v) in layer {
                 out.insert(k.clone(), v.clone());
@@ -56,10 +41,8 @@ impl Scope {
         out
     }
 
-    /// `text` with every `{{name}}` that has a value replaced; the others stay as they are.
     pub fn interpolate(&self, text: &str) -> String {
         let mut current = text.to_string();
-        // A value may itself name variables (`baseUrl: {{host}}/api`); a few rounds settle it.
         for _ in 0..5 {
             let next = self.interpolate_once(&current);
             if next == current {
@@ -99,14 +82,12 @@ impl Scope {
         out
     }
 
-    /// The names in `text` that have no value, to warn about before sending.
     pub fn missing(&self, text: &str) -> Vec<String> {
         let resolved = self.interpolate(text);
         names(&resolved)
     }
 }
 
-/// The variable names `text` refers to.
 pub fn names(text: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut rest = text;
@@ -148,24 +129,12 @@ mod tests {
     #[test]
     fn nearest_scope_wins_and_unknown_names_stay() {
         let mut scope = Scope::default();
-        scope
-            .collection
-            .insert("baseUrl".into(), "http://127.0.0.1:8000".into());
-        scope
-            .environment
-            .insert("baseUrl".into(), "{{host}}/api".into());
-        scope
-            .environment
-            .insert("host".into(), "https://dev.example.com".into());
+        scope.collection.insert("baseUrl".into(), "http://127.0.0.1:8000".into());
+        scope.environment.insert("baseUrl".into(), "{{host}}/api".into());
+        scope.environment.insert("host".into(), "https://dev.example.com".into());
         scope.runtime.insert("token".into(), "abc".into());
-        assert_eq!(
-            scope.interpolate("{{baseUrl}}/me?t={{ token }}&x={{nope}}"),
-            "https://dev.example.com/api/me?t=abc&x={{nope}}"
-        );
-        assert_eq!(
-            scope.missing("{{baseUrl}}/{{nope}}"),
-            vec!["nope".to_string()]
-        );
+        assert_eq!(scope.interpolate("{{baseUrl}}/me?t={{ token }}&x={{nope}}"), "https://dev.example.com/api/me?t=abc&x={{nope}}");
+        assert_eq!(scope.missing("{{baseUrl}}/{{nope}}"), vec!["nope".to_string()]);
     }
 
     #[test]
