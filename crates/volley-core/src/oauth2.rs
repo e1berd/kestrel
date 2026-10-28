@@ -72,7 +72,10 @@ pub async fn browser_and_loopback(authorization_url: &str, callback_url: &str) -
             let head = String::from_utf8_lossy(&buf[..n]).to_string();
             let target = head.split_whitespace().nth(1).unwrap_or("/").to_string();
             if !target.starts_with(callback.path()) {
-                stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n").await.report_err("answer a stray request on the sign-in callback");
+                stream
+                    .write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n")
+                    .await
+                    .report_err("answer a stray request on the sign-in callback");
                 continue;
             }
             let page = "<!doctype html><meta charset=utf-8><title>Kestrel</title><body style=\"font:16px system-ui;padding:3em\">Signed in. You can close this tab and go back to Kestrel.";
@@ -111,11 +114,11 @@ pub async fn token(
         if !token.is_expired() {
             return Ok(token);
         }
-        if let (true, Some(refresh)) = (auto_refresh, token.refresh_token.clone()) {
-            if let Ok(token) = refresh_token(config, client, &refresh).await {
-                session.lock().tokens.insert(id, token.clone());
-                return Ok(token);
-            }
+        if let (true, Some(refresh)) = (auto_refresh, token.refresh_token.clone())
+            && let Ok(token) = refresh_token(config, client, &refresh).await
+        {
+            session.lock().tokens.insert(id, token.clone());
+            return Ok(token);
         }
     }
     if !auto_fetch && !force {

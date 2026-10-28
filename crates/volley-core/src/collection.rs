@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context as _, Result, bail};
 use indexmap::IndexMap;
 
-use crate::format::{CollectionFile, Defaults, EnvironmentFile, FolderFile, Info, RequestFile};
 pub use crate::document::Document;
-pub use crate::loading::{file_stem, sanitize_file_name};
-use crate::loading::{find_root, read_dir, read_dotenv, read_environments, unique_path};
+use crate::format::{CollectionFile, Defaults, EnvironmentFile, FolderFile, Info, RequestFile};
+pub use crate::loading::{file_stem, find_root, sanitize_file_name};
+use crate::loading::{read_dir, read_dotenv, read_environments, unique_path};
 
 pub const COLLECTION_FILE: &str = "opencollection.yml";
 pub const FOLDER_FILE: &str = "folder.yml";
@@ -42,6 +42,7 @@ impl Request {
     }
 }
 #[derive(Debug, Clone)]
+#[allow(clippy::large_enum_variant)]
 pub enum Item {
     Folder(Folder),
     Request(Request),
@@ -161,10 +162,10 @@ impl Collection {
                 if item.path() == path {
                     return Some(item);
                 }
-                if let Item::Folder(folder) = item {
-                    if path.starts_with(&folder.dir) {
-                        return find(&folder.children, path);
-                    }
+                if let Item::Folder(folder) = item
+                    && path.starts_with(&folder.dir)
+                {
+                    return find(&folder.children, path);
                 }
             }
             None
@@ -178,10 +179,10 @@ impl Collection {
                 if item.path() == path {
                     return Some(item);
                 }
-                if let Item::Folder(folder) = item {
-                    if path.starts_with(&folder.dir) {
-                        return find(&mut folder.children, path);
-                    }
+                if let Item::Folder(folder) = item
+                    && path.starts_with(&folder.dir)
+                {
+                    return find(&mut folder.children, path);
                 }
             }
             None
@@ -208,12 +209,13 @@ impl Collection {
         let mut items = &self.items;
         'down: loop {
             for item in items {
-                if let Item::Folder(folder) = item {
-                    if path.starts_with(&folder.dir) && path != folder.dir {
-                        out.push(folder);
-                        items = &folder.children;
-                        continue 'down;
-                    }
+                if let Item::Folder(folder) = item
+                    && path.starts_with(&folder.dir)
+                    && path != folder.dir
+                {
+                    out.push(folder);
+                    items = &folder.children;
+                    continue 'down;
                 }
             }
             return out;

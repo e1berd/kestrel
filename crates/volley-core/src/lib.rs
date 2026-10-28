@@ -1,14 +1,14 @@
 pub mod collection;
 pub mod document;
-mod loading;
 pub mod format;
 pub mod http;
 mod jwt;
+mod loading;
+pub mod oauth2;
 pub mod outcome;
 pub mod plan;
 pub mod report;
 mod request_builder;
-pub mod oauth2;
 pub mod script;
 pub mod session;
 pub mod vars;

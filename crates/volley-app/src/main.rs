@@ -1,61 +1,85 @@
-//! Kestrel (code name volley): a free, open-source API client that keeps collections as plain files
-//! in git, on GPUI.
-
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
+macro_rules! primary {
+    ($keys:literal) => {
+        if cfg!(target_os = "macos") { concat!("cmd-", $keys) } else { concat!("ctrl-", $keys) }
+    };
+}
+
+mod appearance;
+mod dialogs;
 mod env_editor;
 mod interact;
 mod kv_table;
 mod prefs;
 mod project;
+mod project_view;
 mod request_tab;
-mod style;
+mod settings;
+mod ui;
 mod workspace;
 
-use gpui::{App, AppContext as _, Bounds, KeyBinding, WindowBounds, WindowDecorations, WindowOptions, px, size};
-use gpui_component::{Root, Theme, ThemeMode, TitleBar};
+use gpui::{App, AppContext as _, Bounds, KeyBinding, WindowBounds, WindowDecorations, WindowOptions, size};
+use gpui_component::{Root, TitleBar};
+use volley_core::report::report_error;
 
+use crate::appearance::dp;
 use crate::workspace::{
-    CloseTab, NewRequest, NextTab, OpenCollection, PreviousTab, ReloadCollection, SaveRequest, SendRequest, ToggleTheme, Workspace,
+    CloseProject, CloseTab, NewRequest, NextProject, NextTab, OpenCollection, OpenSettings, PreviousProject, PreviousTab, ReloadCollection,
+    SaveRequest, SendRequest, Workspace,
 };
 
 fn main() {
-    // reqwest and gpui each bring rustls; without a default provider the first TLS connection panics.
-    let _ = rustls::crypto::ring::default_provider().install_default();
+    install_tls_provider();
     let initial = std::env::args().nth(1).map(std::path::PathBuf::from);
-
     let application = gpui_platform::application().with_assets(gpui_kit_assets::Assets);
     application.run(move |cx: &mut App| {
         gpui_component::init(cx);
-        let dark = prefs::Prefs::load().dark.unwrap_or(true);
-        Theme::change(if dark { ThemeMode::Dark } else { ThemeMode::Light }, None, cx);
-        cx.bind_keys([
-            KeyBinding::new("secondary-enter", SendRequest, None),
-            KeyBinding::new("secondary-s", SaveRequest, None),
-            KeyBinding::new("secondary-w", CloseTab, None),
-            KeyBinding::new("secondary-n", NewRequest, None),
-            KeyBinding::new("secondary-o", OpenCollection, None),
-            KeyBinding::new("secondary-r", ReloadCollection, Some("Workspace")),
-            KeyBinding::new("secondary-shift-t", ToggleTheme, None),
-            KeyBinding::new("ctrl-tab", NextTab, None),
-            KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
-        ]);
-        let bounds = Bounds::centered(None, size(px(1400.), px(880.)), cx);
-        cx.open_window(
+        appearance::init(cx);
+        bind_keys(cx);
+        let bounds = Bounds::centered(None, size(dp(1440.), dp(900.)), cx);
+        let opened = cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 app_id: Some("dev.kestrel.app".into()),
                 window_decorations: Some(WindowDecorations::Client),
-                window_min_size: Some(size(px(800.), px(500.))),
+                window_min_size: Some(size(dp(860.), dp(520.))),
                 ..TitleBar::window_options()
             },
             move |window, cx| {
                 window.set_window_title("Kestrel");
-                let view = cx.new(|cx| Workspace::new(initial.clone(), window, cx));
-                cx.new(|cx| Root::new(view, window, cx))
+                let workspace = cx.new(|cx| Workspace::new(initial.clone(), window, cx));
+                cx.new(|cx| Root::new(workspace, window, cx))
             },
-        )
-        .expect("the main window");
+        );
+        if let Err(error) = opened {
+            report_error("open the main window", error);
+            cx.quit();
+        }
         cx.activate(true);
     });
+}
+
+fn bind_keys(cx: &mut App) {
+    cx.bind_keys([
+        KeyBinding::new(primary!("enter"), SendRequest, None),
+        KeyBinding::new(primary!("s"), SaveRequest, None),
+        KeyBinding::new(primary!("w"), CloseTab, None),
+        KeyBinding::new(primary!("n"), NewRequest, None),
+        KeyBinding::new(primary!("o"), OpenCollection, None),
+        KeyBinding::new(primary!("r"), ReloadCollection, Some("Workspace")),
+        KeyBinding::new(primary!(","), OpenSettings, None),
+        KeyBinding::new("ctrl-tab", NextTab, None),
+        KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
+        KeyBinding::new(primary!("shift-]"), NextProject, None),
+        KeyBinding::new(primary!("shift-["), PreviousProject, None),
+        KeyBinding::new(primary!("shift-w"), CloseProject, None),
+    ]);
+}
+
+fn install_tls_provider() {
+    // reqwest and gpui each bring rustls; without a default provider the first TLS connection panics.
+    if rustls::crypto::ring::default_provider().install_default().is_err() {
+        report_error("install the TLS provider", "another provider was installed first");
+    }
 }

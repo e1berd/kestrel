@@ -5,12 +5,13 @@ use serde_json::Value as Json;
 
 use crate::format::{Auth, Body};
 use crate::oauth2::{self, Interact};
+use crate::outcome::Outcome;
+use crate::plan::Plan;
+pub use crate::request_builder::fill_path_params;
+use crate::request_builder::{build, interpolate_auth, send_built};
 use crate::script::{self, Header, ReqState, ResState, ScriptState};
 use crate::session::Session;
 use crate::vars::Vars;
-use crate::outcome::{Outcome};
-use crate::plan::Plan;
-use crate::request_builder::{build, interpolate_auth, send_built};
 
 pub async fn send(plan: &Plan, session: &Session, interact: &dyn Interact) -> Outcome {
     let mut outcome = Outcome::default();
@@ -152,10 +153,10 @@ fn apply_script_state(plan: &Plan, session: &Session, state: &ScriptState) {
     for name in &state.deleted_vars {
         session.runtime.shift_remove(name);
     }
-    if let Some(env) = &plan.env_name {
-        if !state.env_changed.is_empty() {
-            session.env_overrides.entry(env.clone()).or_default().extend(state.env_changed.clone());
-        }
+    if let Some(env) = &plan.env_name
+        && !state.env_changed.is_empty()
+    {
+        session.env_overrides.entry(env.clone()).or_default().extend(state.env_changed.clone());
     }
 }
 fn client(settings: &crate::format::Settings, session: &Session) -> Result<reqwest::Client> {

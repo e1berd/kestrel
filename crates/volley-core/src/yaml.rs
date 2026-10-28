@@ -14,10 +14,11 @@ impl Layout {
         let mut previous_blank = false;
         for line in text.lines() {
             let starts_key = line.chars().next().is_some_and(|c| !c.is_whitespace() && c != '#' && c != '-');
-            if starts_key && previous_blank {
-                if let Some((key, _)) = line.split_once(':') {
-                    spaced.insert(key.trim_matches('"').to_string());
-                }
+            if starts_key
+                && previous_blank
+                && let Some((key, _)) = line.split_once(':')
+            {
+                spaced.insert(key.trim_matches('"').to_string());
             }
             previous_blank = line.trim().is_empty();
         }

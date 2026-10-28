@@ -1,6 +1,3 @@
-//! The open collection, shared by the sidebar and every tab: the files, the chosen environment, and
-//! the session (script variables, tokens, cookies) that lasts while the app is open.
-
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -15,7 +12,6 @@ use crate::interact::GuiInteract;
 use crate::prefs::Prefs;
 
 pub enum ProjectEvent {
-    /// The files were read again (after a save, a git checkout, an editor).
     Reloaded,
     EnvironmentChanged,
 }
@@ -25,7 +21,6 @@ pub struct Project {
     pub env: Option<String>,
     pub session: Session,
     pub interact: GuiInteract,
-    /// The last time reading the files failed, shown until they read again.
     pub load_error: Option<String>,
     _watcher: Option<notify::RecommendedWatcher>,
     _watch_task: Option<Task<()>>,
@@ -72,7 +67,6 @@ impl Project {
         cx.notify();
     }
 
-    /// Reads the collection again whenever its files change, once they settle.
     fn watch(&mut self, root: PathBuf, cx: &mut Context<Self>) {
         let (tx, mut rx) = mpsc::unbounded::<()>();
         let git = root.join(".git");
@@ -81,7 +75,9 @@ impl Project {
             if event.kind.is_access() || event.paths.iter().all(|p| p.starts_with(&git)) {
                 return;
             }
-            let _ = tx.unbounded_send(());
+            if tx.unbounded_send(()).is_err() {
+                return;
+            }
         });
         let Ok(mut watcher) = watcher else { return };
         if watcher.watch(&root, RecursiveMode::Recursive).is_err() {
@@ -90,7 +86,6 @@ impl Project {
         self._watcher = Some(watcher);
         self._watch_task = Some(cx.spawn(async move |this, cx| {
             while rx.next().await.is_some() {
-                // A save or a checkout touches many files at once.
                 cx.background_executor().timer(Duration::from_millis(250)).await;
                 while rx.try_recv().is_ok() {}
                 if this.update(cx, |project, cx| project.reload(cx)).is_err() {

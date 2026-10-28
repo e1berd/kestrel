@@ -5,11 +5,11 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use indexmap::IndexMap;
 
-use crate::format::{FolderFile, RequestFile};
 use crate::collection::{COLLECTION_FILE, Environment, FOLDER_FILE, Folder, Item, Request};
 use crate::document::Document;
+use crate::format::{FolderFile, RequestFile};
 
-pub(crate) fn find_root(start: &Path) -> Option<PathBuf> {
+pub fn find_root(start: &Path) -> Option<PathBuf> {
     let start = if start.is_file() { start.parent()? } else { start };
     let start = start.canonicalize().ok()?;
     start.ancestors().find(|dir| dir.join(COLLECTION_FILE).is_file()).map(Path::to_path_buf)

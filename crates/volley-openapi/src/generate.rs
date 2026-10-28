@@ -1,11 +1,11 @@
 use std::collections::{BTreeMap, HashSet};
 
+use crate::samples::{examples, json_text, resolve, skeleton};
+use crate::{Generated, GroupBy, METHODS, Operation};
 use indexmap::IndexMap;
 use serde_json::Value as Json;
 use serde_yaml_ng::Value as Yaml;
 use volley_core::format::{Auth, AuthConfig, Body, Docs, Http, Info, KeyValue, RequestFile, Settings};
-use crate::samples::{examples, json_text, resolve, skeleton};
-use crate::{Generated, GroupBy, METHODS, Operation};
 
 pub fn generate(spec: &Json, group_by: GroupBy) -> Generated {
     let title = spec.pointer("/info/title").and_then(Json::as_str).unwrap_or("API").to_string();

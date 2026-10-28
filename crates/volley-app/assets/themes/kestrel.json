@@ -1,0 +1,37 @@
+{
+  "name": "Kestrel",
+  "light": {
+    "background": "#FFFFFF",
+    "surface": "#F7F6F4",
+    "raised": "#FFFFFF",
+    "border": "#E4E1DD",
+    "hover": "#EFECE8",
+    "text": "#24211E",
+    "muted": "#6F6A64",
+    "accent": "#E8834E",
+    "accent_text": "#FFFFFF",
+    "selection": "#E8834E33",
+    "success": "#2E8A4F",
+    "warning": "#B07415",
+    "danger": "#C9483B",
+    "info": "#2F6EA8",
+    "methods": { "get": "#2E8A4F", "post": "#B07415", "put": "#2F6EA8", "patch": "#8657A6", "delete": "#C9483B", "other": "#2A8585" }
+  },
+  "dark": {
+    "background": "#232323",
+    "surface": "#2A2A2A",
+    "raised": "#313131",
+    "border": "#3C3C3C",
+    "hover": "#363636",
+    "text": "#E9E6E2",
+    "muted": "#A39F99",
+    "accent": "#F0A273",
+    "accent_text": "#2B1A0F",
+    "selection": "#F0A27340",
+    "success": "#7CC690",
+    "warning": "#E8BC63",
+    "danger": "#EC8073",
+    "info": "#7DB1DE",
+    "methods": { "get": "#7CC690", "post": "#E8BC63", "put": "#7DB1DE", "patch": "#C6A0DC", "delete": "#EC8073", "other": "#7FC9C6" }
+  }
+}

@@ -255,14 +255,12 @@ fn print_outcome(plan: &Plan, relative: &str, outcome: &volley_core::Outcome, ve
             println!("        {} {} — {}", paint("✗", RED), test.name, test.error.clone().unwrap_or_default());
         }
     }
-    if verbose {
-        if let Some(response) = &outcome.response {
-            for (k, v) in &response.headers {
-                println!("        {}", paint(&format!("{k}: {v}"), DIM));
-            }
-            for line in response.pretty().lines().take(200) {
-                println!("        {line}");
-            }
+    if verbose && let Some(response) = &outcome.response {
+        for (k, v) in &response.headers {
+            println!("        {}", paint(&format!("{k}: {v}"), DIM));
+        }
+        for line in response.pretty().lines().take(200) {
+            println!("        {line}");
         }
     }
 }

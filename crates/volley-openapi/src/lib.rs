@@ -130,6 +130,6 @@ mod tests {
         let body = collection.request(&path).unwrap().doc.data.http().body.unwrap().as_text();
         assert_eq!(body, "{\"name\": \"Rex\"}");
         assert_eq!(collection.doc.data.openapi_sources(), vec![("spec.json".to_string(), "tags".to_string())]);
-        std::fs::remove_dir_all(&dir).ok();
+        std::fs::remove_dir_all(&dir).expect("remove the test collection");
     }
 }

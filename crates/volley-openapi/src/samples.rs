@@ -4,7 +4,15 @@ use serde_json::Value as Json;
 use serde_yaml_ng::Value as Yaml;
 use volley_core::format::{Body, KeyValue};
 
-pub(crate) fn examples(spec: &Json, op: &Json, url: &str, method: &str, headers: &[KeyValue], params: &[KeyValue], body: Option<&Body>) -> Vec<Yaml> {
+pub(crate) fn examples(
+    spec: &Json,
+    op: &Json,
+    url: &str,
+    method: &str,
+    headers: &[KeyValue],
+    params: &[KeyValue],
+    body: Option<&Body>,
+) -> Vec<Yaml> {
     let mut out = Vec::new();
     for (status, response) in op.get("responses").and_then(Json::as_object).into_iter().flatten() {
         let response = resolve(spec, response);
@@ -85,10 +93,10 @@ pub(crate) fn skeleton(spec: &Json, schema: &Json, depth: usize, seen: &mut Hash
         return Json::Null;
     }
     let reference = schema.get("$ref").and_then(Json::as_str).map(str::to_string);
-    if let Some(r) = &reference {
-        if !seen.insert(r.clone()) {
-            return Json::Object(Default::default());
-        }
+    if let Some(r) = &reference
+        && !seen.insert(r.clone())
+    {
+        return Json::Object(Default::default());
     }
     let schema = resolve(spec, schema);
     let out = (|| {

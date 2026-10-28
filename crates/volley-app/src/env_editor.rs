@@ -1,9 +1,7 @@
-//! Editing environments: their variables, a new one, and which one is in use.
-
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, ParentElement, Render,
-    StatefulInteractiveElement as _, Styled, Window, div, px,
+    StatefulInteractiveElement as _, Styled, Window, div,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::{Input, InputState};
@@ -13,6 +11,7 @@ use volley_core::Document;
 use volley_core::collection::{ENVIRONMENTS_DIR, sanitize_file_name};
 use volley_core::format::EnvironmentFile;
 
+use crate::appearance::dp;
 use crate::kv_table::KvTable;
 use crate::project::Project;
 
@@ -66,7 +65,6 @@ impl EnvEditor {
             if path.exists() {
                 return Err(anyhow::anyhow!("there is an environment called {name} already"));
             }
-            // A new one starts with the variables of the one shown, values emptied.
             let variables = project
                 .collection
                 .environments
@@ -93,11 +91,11 @@ impl Render for EnvEditor {
         let active = self.project.read(cx).env.clone();
         let theme = cx.theme();
         h_flex()
-            .h(px(440.))
+            .h(dp(440.))
             .gap_3()
             .child(
                 v_flex()
-                    .w(px(170.))
+                    .w(dp(170.))
                     .flex_none()
                     .gap_1()
                     .children(names.iter().enumerate().map(|(i, name)| {

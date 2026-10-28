@@ -54,10 +54,10 @@ impl Plan {
             return own;
         }
         for (_, defaults) in self.chain.iter().rev() {
-            if let Some(auth) = &defaults.auth {
-                if auth.mode() != "inherit" {
-                    return auth.clone();
-                }
+            if let Some(auth) = &defaults.auth
+                && auth.mode() != "inherit"
+            {
+                return auth.clone();
             }
         }
         Auth::Mode("none".into())

@@ -1,9 +1,6 @@
-//! A table of name–value rows with a switch each: parameters, headers, form fields, variables. There
-//! is always an empty row at the end; typing into it adds the next.
-
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AppContext as _, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window, div, px,
+    AppContext as _, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, SharedString, Styled, Subscription, Window, div,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
@@ -11,10 +8,11 @@ use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{ActiveTheme as _, IconName, Sizable as _, h_flex, v_flex};
 use volley_core::format::KeyValue;
 
+use crate::appearance::dp;
+
 pub struct KvChanged;
 
 struct Row {
-    /// The row as it was read, so what the table does not show (description, type, …) is kept.
     base: KeyValue,
     enabled: bool,
     name: Entity<InputState>,
@@ -25,11 +23,9 @@ struct Row {
 pub struct KvTable {
     id: SharedString,
     rows: Vec<Row>,
-    /// The `type` new rows get (`query` for parameters).
     new_kind: Option<String>,
     name_placeholder: SharedString,
     value_placeholder: SharedString,
-    /// Whether a row's `type` shows as a tag (path or query).
     show_kind: bool,
 }
 
@@ -99,7 +95,6 @@ impl KvTable {
         }
     }
 
-    /// The rows as they would be saved, without the empty one at the end.
     pub fn items(&self, cx: &gpui::App) -> Vec<KeyValue> {
         self.rows
             .iter()
@@ -113,7 +108,6 @@ impl KvTable {
             .collect()
     }
 
-    /// Adds a row unless one with that name and type is there.
     pub fn ensure(&mut self, item: KeyValue, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.rows.iter().any(|row| row.base.kind == item.kind && row.name.read(cx).value() == item.name.as_str()) {
             return false;
@@ -128,7 +122,6 @@ impl KvTable {
         true
     }
 
-    /// Drops rows of `kind` whose names `keep` does not hold and that have no value.
     pub fn retain_kind(&mut self, kind: &str, keep: &[String], cx: &mut Context<Self>) -> bool {
         let before = self.rows.len();
         self.rows.retain(|row| {
@@ -174,7 +167,7 @@ impl Render for KvTable {
                 .w_full()
                 .gap_2()
                 .items_center()
-                .child(div().w(px(20.)).when(!blank, |el| {
+                .child(div().w(dp(20.)).when(!blank, |el| {
                     el.child(
                         Checkbox::new((self.id.clone(), index))
                             .checked(row.enabled)
@@ -183,8 +176,8 @@ impl Render for KvTable {
                 }))
                 .child(div().w(gpui::relative(0.35)).flex_none().min_w_0().child(Input::new(&row.name).small()))
                 .child(div().flex_1().min_w_0().child(Input::new(&row.value).small()))
-                .child(div().w(px(44.)).text_xs().text_color(muted).when_some(kind, |el, kind| el.child(kind)))
-                .child(div().w(px(24.)).when(!blank, |el| {
+                .child(div().w(dp(44.)).text_xs().text_color(muted).when_some(kind, |el, kind| el.child(kind)))
+                .child(div().w(dp(24.)).when(!blank, |el| {
                     el.child(
                         Button::new((SharedString::from(format!("{}-remove", self.id)), index))
                             .xsmall()

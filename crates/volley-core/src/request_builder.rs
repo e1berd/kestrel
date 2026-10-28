@@ -8,11 +8,11 @@ use serde_json::Value as Json;
 
 use crate::format::{Auth, AuthConfig};
 use crate::oauth2::{self, Interact, Placement};
+use crate::outcome::{Response, SentRequest};
+use crate::plan::Plan;
 use crate::script::ReqState;
 use crate::session::Session;
 use crate::vars::Scope;
-use crate::outcome::{Response, SentRequest};
-use crate::plan::Plan;
 
 pub(crate) struct Built {
     pub(crate) sent: SentRequest,
@@ -202,10 +202,10 @@ pub fn fill_path_params(url: &str, params: &[(String, String)]) -> String {
     let segments: Vec<String> = head
         .split('/')
         .map(|segment| {
-            if let Some(name) = segment.strip_prefix(':') {
-                if let Some((_, value)) = params.iter().find(|(n, v)| n == name && !v.is_empty()) {
-                    return utf8_percent_encode(value, SEGMENT).to_string();
-                }
+            if let Some(name) = segment.strip_prefix(':')
+                && let Some((_, value)) = params.iter().find(|(n, v)| n == name && !v.is_empty())
+            {
+                return utf8_percent_encode(value, SEGMENT).to_string();
             }
             segment.to_string()
         })

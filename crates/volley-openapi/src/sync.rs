@@ -1,6 +1,8 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use crate::GroupBy;
+use crate::generate::{generate, request_key};
 use anyhow::{Context as _, Result};
 use indexmap::IndexMap;
 use serde_json::Value as Json;
@@ -8,8 +10,6 @@ use serde_yaml_ng::Value as Yaml;
 use volley_core::collection::{FOLDER_FILE, file_stem, sanitize_file_name};
 use volley_core::format::{Auth, Docs, FolderFile, Info, KeyValue, RequestFile};
 use volley_core::{Collection, Document, Item};
-use crate::GroupBy;
-use crate::generate::{generate, request_key};
 
 #[derive(Debug, Default, Clone)]
 pub struct Report {
@@ -169,10 +169,10 @@ pub(crate) fn refresh(file: &mut RequestFile, generated: &RequestFile) {
 }
 pub(crate) fn folder_dir(collection: &Collection, name: &str, docs: Option<&String>) -> Result<PathBuf> {
     for item in &collection.items {
-        if let Item::Folder(folder) = item {
-            if folder.name() == name || file_stem(&folder.dir) == sanitize_file_name(name) {
-                return Ok(folder.dir.clone());
-            }
+        if let Item::Folder(folder) = item
+            && (folder.name() == name || file_stem(&folder.dir) == sanitize_file_name(name))
+        {
+            return Ok(folder.dir.clone());
         }
     }
     let dir = collection.root.join(sanitize_file_name(name));

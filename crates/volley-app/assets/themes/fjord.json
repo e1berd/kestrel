@@ -1,0 +1,37 @@
+{
+  "name": "Fjord",
+  "light": {
+    "background": "#FFFFFF",
+    "surface": "#F3F6F8",
+    "raised": "#FFFFFF",
+    "border": "#DCE3E8",
+    "hover": "#E8EEF2",
+    "text": "#1C2730",
+    "muted": "#5F6E7A",
+    "accent": "#2F9C93",
+    "accent_text": "#FFFFFF",
+    "selection": "#2F9C9333",
+    "success": "#2E8A4F",
+    "warning": "#A8700F",
+    "danger": "#C4473C",
+    "info": "#2C6CB0",
+    "methods": { "get": "#2E8A4F", "post": "#A8700F", "put": "#2C6CB0", "patch": "#7D58B0", "delete": "#C4473C", "other": "#2F9C93" }
+  },
+  "dark": {
+    "background": "#1F262C",
+    "surface": "#252D34",
+    "raised": "#2C353D",
+    "border": "#38434C",
+    "hover": "#313B44",
+    "text": "#E3E9EE",
+    "muted": "#98A6B1",
+    "accent": "#6CCBC1",
+    "accent_text": "#0E2422",
+    "selection": "#6CCBC140",
+    "success": "#7CC690",
+    "warning": "#E3BA6A",
+    "danger": "#EA8277",
+    "info": "#80B4E6",
+    "methods": { "get": "#7CC690", "post": "#E3BA6A", "put": "#80B4E6", "patch": "#BBA2E6", "delete": "#EA8277", "other": "#6CCBC1" }
+  }
+}
