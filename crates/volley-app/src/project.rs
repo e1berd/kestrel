@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::process::Command;
+use std::time::{Duration, SystemTime};
 
 use anyhow::Result;
 use futures::StreamExt as _;
@@ -8,12 +9,21 @@ use gpui::{AppContext as _, Context, Entity, EventEmitter, Task};
 use notify::{RecursiveMode, Watcher as _};
 use volley_core::{Collection, Session};
 
+use volley_core::report::report_error;
+
 use crate::interact::GuiInteract;
 use crate::prefs::Prefs;
+use crate::ui::ReportUnlessGone as _;
 
 pub enum ProjectEvent {
     Reloaded,
     EnvironmentChanged,
+}
+
+#[derive(Clone)]
+pub struct GitStatus {
+    pub branch: String,
+    pub changed: usize,
 }
 
 pub struct Project {
@@ -22,6 +32,8 @@ pub struct Project {
     pub session: Session,
     pub interact: GuiInteract,
     pub load_error: Option<String>,
+    pub git: Option<GitStatus>,
+    pub last_sync: Option<SystemTime>,
     _watcher: Option<notify::RecommendedWatcher>,
     _watch_task: Option<Task<()>>,
 }
@@ -36,9 +48,19 @@ impl Project {
         Prefs::update(|p| p.opened(&collection.root));
         let root = collection.root.clone();
         Ok(cx.new(|cx| {
-            let mut project =
-                Self { collection, env, session: Session::new(), interact, load_error: None, _watcher: None, _watch_task: None };
+            let mut project = Self {
+                collection,
+                env,
+                session: Session::new(),
+                interact,
+                load_error: None,
+                git: None,
+                last_sync: None,
+                _watcher: None,
+                _watch_task: None,
+            };
             project.watch(root, cx);
+            project.refresh_git(cx);
             project
         }))
     }
@@ -63,15 +85,34 @@ impl Project {
         if self.env.as_ref().is_some_and(|name| self.collection.environment(name).is_none()) {
             self.env = None;
         }
+        self.refresh_git(cx);
         cx.emit(ProjectEvent::Reloaded);
         cx.notify();
+    }
+
+    fn refresh_git(&mut self, cx: &mut Context<Self>) {
+        let root = self.collection.root.clone();
+        let task = cx.background_spawn(async move { read_git_status(&root) });
+        cx.spawn(async move |project, cx| {
+            let git = task.await;
+            project
+                .update(cx, |project, cx| {
+                    project.git = git;
+                    cx.notify();
+                })
+                .report_unless_gone("show the git status");
+        })
+        .detach();
     }
 
     fn watch(&mut self, root: PathBuf, cx: &mut Context<Self>) {
         let (tx, mut rx) = mpsc::unbounded::<()>();
         let git = root.join(".git");
         let watcher = notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-            let Ok(event) = event else { return };
+            let event = match event {
+                Ok(event) => event,
+                Err(error) => return report_error("watch the collection", error),
+            };
             if event.kind.is_access() || event.paths.iter().all(|p| p.starts_with(&git)) {
                 return;
             }
@@ -79,9 +120,12 @@ impl Project {
                 return;
             }
         });
-        let Ok(mut watcher) = watcher else { return };
-        if watcher.watch(&root, RecursiveMode::Recursive).is_err() {
-            return;
+        let mut watcher = match watcher {
+            Ok(watcher) => watcher,
+            Err(error) => return report_error("watch the collection", error),
+        };
+        if let Err(error) = watcher.watch(&root, RecursiveMode::Recursive) {
+            return report_error("watch the collection", error);
         }
         self._watcher = Some(watcher);
         self._watch_task = Some(cx.spawn(async move |this, cx| {
@@ -94,4 +138,21 @@ impl Project {
             }
         }));
     }
+}
+
+fn read_git_status(root: &Path) -> Option<GitStatus> {
+    let run = |args: &[&str]| -> Option<String> {
+        match Command::new("git").arg("-C").arg(root).args(args).output() {
+            Ok(output) if output.status.success() => Some(String::from_utf8_lossy(&output.stdout).trim().to_string()),
+            Ok(_) => None,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                report_error("read the git status", error);
+                None
+            }
+        }
+    };
+    let branch = run(&["rev-parse", "--abbrev-ref", "HEAD"])?;
+    let changed = run(&["status", "--porcelain", "--", "."]).map(|out| out.lines().filter(|line| !line.is_empty()).count()).unwrap_or(0);
+    Some(GitStatus { branch, changed })
 }

@@ -7,6 +7,7 @@ macro_rules! primary {
 }
 
 mod appearance;
+mod assets;
 mod dialogs;
 mod env_editor;
 mod interact;
@@ -25,14 +26,14 @@ use volley_core::report::report_error;
 
 use crate::appearance::dp;
 use crate::workspace::{
-    CloseProject, CloseTab, NewRequest, NextProject, NextTab, OpenCollection, OpenSettings, PreviousProject, PreviousTab, ReloadCollection,
-    SaveRequest, SendRequest, Workspace,
+    CloseProject, CloseTab, NewRequest, NextProject, NextTab, OpenCollection, OpenCommandPalette, OpenSettings, PreviousProject,
+    PreviousTab, ReloadCollection, SaveRequest, SendRequest, Workspace,
 };
 
 fn main() {
     install_tls_provider();
     let initial = std::env::args().nth(1).map(std::path::PathBuf::from);
-    let application = gpui_platform::application().with_assets(gpui_kit_assets::Assets);
+    let application = gpui_platform::application().with_assets(assets::AppAssets);
     application.run(move |cx: &mut App| {
         gpui_component::init(cx);
         appearance::init(cx);
@@ -69,6 +70,8 @@ fn bind_keys(cx: &mut App) {
         KeyBinding::new(primary!("o"), OpenCollection, None),
         KeyBinding::new(primary!("r"), ReloadCollection, Some("Workspace")),
         KeyBinding::new(primary!(","), OpenSettings, None),
+        KeyBinding::new(primary!("k"), OpenCommandPalette, None),
+        KeyBinding::new(primary!("p"), OpenCommandPalette, None),
         KeyBinding::new("ctrl-tab", NextTab, None),
         KeyBinding::new("ctrl-shift-tab", PreviousTab, None),
         KeyBinding::new(primary!("shift-]"), NextProject, None),

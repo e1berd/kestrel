@@ -12,9 +12,9 @@ use gpui::{
     Window, div,
 };
 use gpui_component::input::{InputEvent, InputState};
-use gpui_component::{ActiveTheme as _, ResizableState, WindowExt as _, h_resizable, resizable_panel, v_flex};
+use gpui_component::{ResizableState, WindowExt as _, h_resizable, resizable_panel, v_flex};
 
-use crate::appearance::dp;
+use crate::appearance::{self, dp};
 use crate::dialogs::confirm;
 use crate::project::{Project, ProjectEvent};
 use crate::request_tab::{RequestTab, TabEvent};
@@ -163,6 +163,7 @@ impl ProjectView {
     }
 
     fn render_editor_area(&self, cx: &mut Context<Self>) -> AnyElement {
+        let palette = appearance::palette(cx);
         let editor: AnyElement = match self.active_tab() {
             Some(tab) => tab.clone().into_any_element(),
             None => v_flex()
@@ -170,16 +171,25 @@ impl ProjectView {
                 .items_center()
                 .justify_center()
                 .gap_2()
-                .text_color(cx.theme().muted_foreground)
-                .child("Pick a request on the left, or make one with +")
-                .child(hint("Ctrl+Enter sends · Ctrl+S saves · Ctrl+W closes · Ctrl+N new request · Ctrl+, settings", cx))
+                .text_color(palette.muted)
+                .child("Pick a request on the left, or press Ctrl K")
+                .child(hint("Ctrl Enter sends · Ctrl S saves · Ctrl W closes · Ctrl N new request · Ctrl , settings", cx))
                 .into_any_element(),
         };
-        v_flex()
+        div()
             .size_full()
-            .bg(cx.theme().background)
-            .when(!self.tabs.is_empty(), |el| el.child(self.render_tab_strip(cx)))
-            .child(div().flex_1().min_h_0().child(editor))
+            .pl(dp(6.))
+            .child(
+                v_flex()
+                    .size_full()
+                    .rounded(dp(14.))
+                    .overflow_hidden()
+                    .bg(palette.background)
+                    .border_1()
+                    .border_color(palette.border_soft)
+                    .when(!self.tabs.is_empty(), |el| el.child(self.render_tab_strip(cx)))
+                    .child(div().flex_1().min_h_0().child(editor)),
+            )
             .into_any_element()
     }
 }
@@ -188,7 +198,7 @@ impl Render for ProjectView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         h_resizable("project")
             .with_state(&self.layout)
-            .child(resizable_panel().size(dp(290.)).size_range(dp(180.)..dp(640.)).child(self.render_sidebar(cx)))
+            .child(resizable_panel().size(dp(276.)).size_range(dp(180.)..dp(640.)).child(self.render_sidebar(cx)))
             .child(resizable_panel().child(self.render_editor_area(cx)))
     }
 }

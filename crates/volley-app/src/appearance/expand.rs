@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use gpui::Hsla;
-use gpui_component::highlighter::HighlightTheme;
+use gpui_component::highlighter::{HighlightTheme, SyntaxColors, ThemeStyle};
 use gpui_component::theme::ThemeColor;
 
-use super::palette::{Palette, mix};
+use super::palette::{Palette, SyntaxPalette, mix};
 
 pub fn apply_palette(palette: &Palette, colors: &mut ThemeColor, is_dark: bool) {
     let ink = if is_dark { gpui::white() } else { gpui::black() };
@@ -13,7 +13,7 @@ pub fn apply_palette(palette: &Palette, colors: &mut ThemeColor, is_dark: bool) 
 
     colors.background = palette.background;
     colors.foreground = palette.text;
-    colors.border = palette.border;
+    colors.border = palette.border_soft;
     colors.input = palette.border;
     colors.ring = palette.accent;
     colors.caret = palette.accent;
@@ -105,7 +105,7 @@ pub fn apply_palette(palette: &Palette, colors: &mut ThemeColor, is_dark: bool) 
 
     colors.list = palette.background;
     colors.list_hover = palette.hover;
-    colors.list_active = Hsla { a: 0.16, ..palette.accent };
+    colors.list_active = mix(palette.surface, palette.accent, 0.12);
     colors.list_active_border = palette.accent;
     colors.list_even = mix(palette.background, palette.surface, 0.5);
     colors.list_head = palette.surface;
@@ -123,21 +123,21 @@ pub fn apply_palette(palette: &Palette, colors: &mut ThemeColor, is_dark: bool) 
 
     colors.sidebar = palette.surface;
     colors.sidebar_foreground = palette.text;
-    colors.sidebar_border = palette.border;
+    colors.sidebar_border = palette.border_soft;
     colors.sidebar_accent = palette.hover;
     colors.sidebar_accent_foreground = palette.text;
     colors.sidebar_primary = palette.accent;
     colors.sidebar_primary_foreground = palette.accent_text;
 
     colors.title_bar = palette.surface;
-    colors.title_bar_border = palette.border;
+    colors.title_bar_border = palette.surface;
     colors.status_bar = palette.surface;
     colors.status_bar_border = palette.border;
 
-    colors.tab_bar = palette.surface;
+    colors.tab_bar = palette.background;
     colors.tab_bar_segmented = palette.hover;
     colors.tab = transparent;
-    colors.tab_active = palette.background;
+    colors.tab_active = palette.raised;
     colors.tab_active_foreground = palette.text;
     colors.tab_foreground = palette.muted;
 
@@ -206,11 +206,41 @@ pub fn raise_contrast(colors: &mut ThemeColor, is_dark: bool) {
 
 pub fn editor_colors(base: &HighlightTheme, palette: &Palette) -> Arc<HighlightTheme> {
     let mut theme = base.clone();
-    theme.style.editor_background = Some(palette.background);
-    theme.style.editor_gutter_background = Some(palette.background);
+    theme.style.editor_background = Some(palette.code);
+    theme.style.editor_gutter_background = Some(palette.code);
     theme.style.editor_foreground = Some(palette.text);
     theme.style.editor_active_line = Some(Hsla { a: 0.5, ..palette.hover });
-    theme.style.editor_line_number = Some(Hsla { a: 0.7, ..palette.muted });
+    theme.style.editor_line_number = Some(Hsla { a: 0.55, ..palette.faint });
+    if let Some(syntax) = &palette.syntax {
+        apply_syntax(&mut theme.style.syntax, syntax);
+    }
     theme.style.editor_active_line_number = Some(palette.text);
     Arc::new(theme)
+}
+
+fn apply_syntax(colors: &mut SyntaxColors, syntax: &SyntaxPalette) {
+    let style = |hex: &str| match serde_json::from_value::<ThemeStyle>(serde_json::json!({ "color": hex })) {
+        Ok(style) => Some(style),
+        Err(error) => {
+            volley_core::report::report_error(&format!("read the syntax colour {hex}"), error);
+            None
+        }
+    };
+    colors.property = style(&syntax.property);
+    colors.label = style(&syntax.property);
+    colors.string = style(&syntax.string);
+    colors.number = style(&syntax.number);
+    colors.boolean = style(&syntax.keyword);
+    colors.keyword = style(&syntax.keyword);
+    colors.constant = style(&syntax.keyword);
+    colors.punctuation = style(&syntax.punctuation);
+    colors.punctuation_bracket = style(&syntax.punctuation);
+    colors.punctuation_delimiter = style(&syntax.punctuation);
+    colors.operator = style(&syntax.punctuation);
+    if let Some(comment) = &syntax.comment {
+        colors.comment = style(comment);
+    }
+    if let Some(function) = &syntax.function {
+        colors.function = style(function);
+    }
 }

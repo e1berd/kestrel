@@ -1,41 +1,131 @@
-use gpui::{AnyElement, Context, FontWeight, IntoElement, ParentElement as _, Styled as _, div};
-use gpui_component::button::Button;
+use gpui::prelude::FluentBuilder as _;
+use gpui::{
+    AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
+    Styled as _, div, rems,
+};
+use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_component::{ActiveTheme as _, IconName, Sizable as _, h_flex};
+use gpui_component::{Icon, Sizable as _, h_flex};
+use gpui_kit_assets::IconName;
 
 use super::Workspace;
-use crate::appearance::dp;
+use super::command_palette;
+use crate::appearance::{self, MONO_FONT, dp};
+use crate::settings;
 use crate::ui::ReportUnlessGone as _;
 
 impl Workspace {
     pub(super) fn render_title(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
         let project_name = self.active_view().map(|view| view.read(cx).name(cx));
         h_flex()
             .w_full()
             .pr_2()
+            .gap_3()
+            .items_center()
+            .child(
+                h_flex()
+                    .flex_none()
+                    .min_w(dp(220.))
+                    .gap_2()
+                    .items_center()
+                    .child(
+                        div()
+                            .size(dp(22.))
+                            .rounded(dp(7.))
+                            .bg(palette.accent)
+                            .flex()
+                            .items_center()
+                            .justify_center()
+                            .child(Icon::new(IconName::Bird).size(dp(14.)).text_color(palette.accent_text)),
+                    )
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child("Kestrel"))
+                    .when_some(project_name, |el, name| {
+                        el.child(div().text_color(palette.faint).child("/")).child(div().text_color(palette.muted).child(name))
+                    }),
+            )
+            .child(h_flex().flex_1().justify_center().child(self.render_search_button(cx)))
+            .child(self.render_env_picker(cx))
+            .child(
+                div()
+                    .id("title-settings")
+                    .size(dp(30.))
+                    .rounded(dp(8.))
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .cursor_pointer()
+                    .text_color(palette.muted)
+                    .hover(|el| el.bg(palette.hover))
+                    .child(Icon::new(IconName::Settings).small())
+                    .on_click(|_, window, cx| settings::open(window, cx)),
+            )
+    }
+
+    fn render_search_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        let workspace = cx.entity().downgrade();
+        h_flex()
+            .id("command-search")
+            .w_full()
+            .max_w(dp(520.))
+            .h(dp(32.))
+            .px(dp(10.))
             .gap_2()
             .items_center()
-            .child(div().text_sm().font_weight(FontWeight::BOLD).text_color(cx.theme().primary).child("Kestrel"))
-            .children(project_name.map(|name| div().text_sm().text_color(cx.theme().muted_foreground).child(name)))
-            .child(div().flex_1())
-            .child(self.render_env_picker(cx))
-            .child(div().w(dp(8.)))
+            .rounded(dp(9.))
+            .border_1()
+            .border_color(palette.border)
+            .bg(palette.background)
+            .text_color(palette.faint)
+            .cursor_pointer()
+            .hover(|el| el.border_color(palette.muted))
+            .child(Icon::new(IconName::Search).small())
+            .child(div().flex_1().child("Find a request or a command"))
+            .child(
+                div()
+                    .px(dp(6.))
+                    .py(dp(1.))
+                    .rounded(dp(5.))
+                    .bg(palette.raised)
+                    .font_family(MONO_FONT)
+                    .text_size(rems(0.7))
+                    .text_color(palette.muted)
+                    .child(shortcut("K")),
+            )
+            .on_click(move |_, window, cx| {
+                workspace
+                    .update(cx, |workspace, cx| command_palette::open(workspace, window, cx))
+                    .report_unless_gone("open the command palette");
+            })
     }
 
     fn render_env_picker(&self, cx: &mut Context<Self>) -> AnyElement {
         let Some(view) = self.active_view() else { return div().into_any_element() };
+        let palette = appearance::palette(cx);
         let project = view.read(cx).project.clone();
         let read = project.read(cx);
         let current = read.env.clone();
         let names: Vec<String> = read.collection.environments.iter().map(|env| env.name()).collect();
+        let dot = if current.is_some() { palette.success } else { palette.faint };
         let label = current.clone().unwrap_or_else(|| "No environment".into());
         let view = view.downgrade();
+        let content = h_flex()
+            .gap(dp(7.))
+            .items_center()
+            .text_color(palette.text)
+            .child(div().size(dp(7.)).rounded_full().bg(dot))
+            .child(label)
+            .child(Icon::new(gpui_component::IconName::ChevronDown).xsmall().text_color(palette.faint));
         Button::new("environment")
-            .small()
-            .outline()
-            .icon(IconName::Globe)
-            .label(label)
-            .dropdown_caret(true)
+            .ghost()
+            .h(dp(30.))
+            .px(dp(11.))
+            .rounded_full()
+            .border_1()
+            .border_color(palette.border)
+            .bg(palette.background)
+            .child(content)
             .dropdown_menu(move |menu, _, _| {
                 let pick = |name: Option<String>, label: String, is_checked: bool| {
                     let project = project.clone();
@@ -55,4 +145,8 @@ impl Workspace {
             })
             .into_any_element()
     }
+}
+
+pub fn shortcut(key: &str) -> String {
+    if cfg!(target_os = "macos") { format!("⌘ {key}") } else { format!("Ctrl {key}") }
 }

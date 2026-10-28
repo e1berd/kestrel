@@ -9,34 +9,20 @@ use gpui_component::{ActiveTheme as _, IconName, Sizable as _, Theme, v_flex};
 
 use super::Workspace;
 use crate::appearance::{dp, palette::mix};
-use crate::settings;
 use crate::ui::ReportUnlessGone as _;
 
 impl Workspace {
     pub(super) fn render_rail(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = cx.theme();
         v_flex()
             .id("project-rail")
-            .w(dp(58.))
+            .w(dp(52.))
             .h_full()
             .flex_none()
-            .py_2()
-            .gap_2()
+            .pt(dp(6.))
+            .gap(dp(10.))
             .items_center()
-            .bg(theme.title_bar)
-            .border_r_1()
-            .border_color(theme.border)
             .children((0..self.views.len()).map(|index| self.render_project_badge(index, cx)))
             .child(self.render_open_menu(cx))
-            .child(div().flex_1())
-            .child(
-                Button::new("open-settings")
-                    .small()
-                    .ghost()
-                    .icon(IconName::Settings)
-                    .tooltip("Settings (Ctrl+,)")
-                    .on_click(|_, window, cx| settings::open(window, cx)),
-            )
     }
 
     fn render_project_badge(&self, index: usize, cx: &mut Context<Self>) -> AnyElement {
@@ -52,15 +38,17 @@ impl Workspace {
         div()
             .id(("project", index))
             .relative()
-            .size(dp(38.))
+            .size(dp(36.))
             .flex()
             .items_center()
             .justify_center()
-            .rounded(dp(10.))
+            .rounded(dp(11.))
             .cursor_pointer()
             .text_sm()
             .font_weight(FontWeight::SEMIBOLD)
-            .when(is_active, |el| el.bg(theme.primary).text_color(theme.primary_foreground))
+            .when(is_active, |el| {
+                el.bg(theme.primary).text_color(theme.primary_foreground).border_2().border_color(gpui::Hsla { a: 0.45, ..theme.primary })
+            })
             .when(!is_active, |el| el.bg(tint).text_color(theme.foreground).hover(|el| el.bg(mix(tint, theme.primary, 0.25))))
             .child(initials(&name))
             .when(has_unsaved, |el| {

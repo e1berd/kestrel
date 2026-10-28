@@ -29,7 +29,10 @@ impl ProjectView {
             project
                 .update_in(cx, |project, window, cx| {
                     match result {
-                        Ok(report) => window.push_notification(Notification::success(sync_summary(&report)), cx),
+                        Ok(report) => {
+                            project.last_sync = Some(std::time::SystemTime::now());
+                            window.push_notification(Notification::success(sync_summary(&report)), cx)
+                        }
                         Err(error) => window.push_notification(Notification::error(format!("Sync failed: {error:#}")), cx),
                     }
                     project.reload(cx);

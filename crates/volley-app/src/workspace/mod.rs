@@ -1,6 +1,10 @@
+mod command_palette;
 mod rail;
 mod sign_in;
+mod status_bar;
 mod title_bar;
+
+pub use title_bar::shortcut;
 mod welcome;
 
 use std::path::{Path, PathBuf};
@@ -14,7 +18,7 @@ use gpui::{
 use gpui_component::notification::Notification;
 use gpui_component::{ActiveTheme as _, TitleBar, WindowExt as _, h_flex, v_flex};
 
-use crate::appearance;
+use crate::appearance::{self, dp};
 use crate::dialogs::confirm;
 use crate::interact::{GuiInteract, PastePrompt};
 use crate::prefs::Prefs;
@@ -38,7 +42,8 @@ actions!(
         NextProject,
         PreviousProject,
         CloseProject,
-        OpenSettings
+        OpenSettings,
+        OpenCommandPalette
     ]
 );
 
@@ -202,15 +207,18 @@ impl Render for Workspace {
             .on_action(cx.listener(|workspace, _: &PreviousProject, window, cx| workspace.cycle_project(false, window, cx)))
             .on_action(cx.listener(|workspace, _: &CloseProject, window, cx| workspace.close_project(workspace.active, window, cx)))
             .on_action(cx.listener(|_, _: &OpenSettings, window, cx| settings::open(window, cx)))
-            .bg(cx.theme().background)
+            .on_action(cx.listener(|workspace, _: &OpenCommandPalette, window, cx| command_palette::open(workspace, window, cx)))
+            .bg(appearance::palette(cx).surface)
             .text_color(cx.theme().foreground)
             .child(TitleBar::new().child(self.render_title(cx)))
             .child(
                 h_flex()
                     .flex_1()
                     .min_h_0()
+                    .pr(dp(8.))
                     .child(self.render_rail(cx))
                     .child(div().flex_1().min_w_0().h_full().child(self.render_content(cx))),
             )
+            .child(self.render_status_bar(cx))
     }
 }

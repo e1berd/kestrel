@@ -2,18 +2,19 @@ use std::path::{Path, PathBuf};
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, ElementId, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    AnyElement, App, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, div, rems,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::Input;
 use gpui_component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem};
-use gpui_component::{ActiveTheme as _, Icon, IconName, Sizable as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
+use gpui_kit_assets::IconName;
 use volley_core::Item;
 
 use super::ProjectView;
-use crate::appearance::dp;
-use crate::ui::{ReportUnlessGone as _, method_label};
+use crate::appearance::{self, dp};
+use crate::ui::{ReportUnlessGone as _, eyebrow, method_badge};
 
 struct Row {
     path: PathBuf,
@@ -21,69 +22,77 @@ struct Row {
     method: Option<String>,
     depth: usize,
     is_open: bool,
+    count: usize,
 }
 
 type TreeAction = fn(&mut ProjectView, PathBuf, &mut Window, &mut Context<ProjectView>);
 
 impl ProjectView {
     pub(super) fn render_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
+        let palette = appearance::palette(cx);
         let project = self.project.read(cx);
         let filter = self.filter.read(cx).value().to_lowercase();
         let mut rows = Vec::new();
         self.collect_rows(&project.collection.items, 0, &filter, &mut rows);
         let active_path = self.active_tab().map(|tab| tab.read(cx).path.clone());
         let load_error = project.load_error.clone();
-        let theme = cx.theme();
         v_flex()
             .size_full()
-            .bg(theme.sidebar)
-            .border_r_1()
-            .border_color(theme.sidebar_border)
+            .pt(dp(6.))
+            .px(dp(4.))
+            .gap(dp(10.))
             .child(self.render_sidebar_header(cx))
-            .when_some(load_error, |el, error| el.child(div().mx_2().mb_1().text_xs().text_color(cx.theme().danger).child(error)))
-            .child(div().px_2().pb_2().child(Input::new(&self.filter).small().cleanable(true)))
+            .when_some(load_error, |el, error| el.child(div().mx_2().text_xs().text_color(palette.danger).child(error)))
+            .child(
+                div()
+                    .px(dp(2.))
+                    .child(Input::new(&self.filter).prefix(Icon::new(IconName::Search).small().text_color(palette.faint)).cleanable(true)),
+            )
             .child(
                 div()
                     .id("tree")
                     .flex_1()
                     .min_h_0()
                     .overflow_y_scroll()
-                    .px_1()
                     .pb_4()
-                    .children(rows.into_iter().map(|row| self.render_row(row, active_path.as_deref(), cx))),
+                    .child(v_flex().gap(dp(1.)).children(rows.into_iter().map(|row| self.render_row(row, active_path.as_deref(), cx)))),
             )
             .into_any_element()
     }
 
     fn render_sidebar_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
         let view = cx.entity().downgrade();
+        let icon_button = |id: &'static str, icon: IconName| {
+            div()
+                .id(id)
+                .size(dp(26.))
+                .rounded(dp(7.))
+                .flex()
+                .items_center()
+                .justify_center()
+                .cursor_pointer()
+                .text_color(palette.muted)
+                .hover(|el| el.bg(palette.hover).text_color(palette.text))
+                .child(Icon::new(icon).small())
+        };
         h_flex()
-            .px_2()
-            .py_2()
-            .gap_1()
+            .px(dp(6.))
+            .gap(dp(2.))
             .items_center()
-            .child(div().flex_1().min_w_0().truncate().text_sm().font_weight(FontWeight::SEMIBOLD).child(self.name(cx)))
+            .child(eyebrow("Collection", cx))
+            .child(div().flex_1())
             .child(
-                Button::new("add-request")
-                    .xsmall()
-                    .ghost()
-                    .icon(IconName::Plus)
-                    .tooltip("New request")
-                    .on_click(cx.listener(|view, _, window, cx| view.new_request(None, window, cx))),
+                icon_button("add-request", IconName::Plus).on_click(cx.listener(|view, _, window, cx| view.new_request(None, window, cx))),
             )
             .child(
-                Button::new("sync-openapi")
-                    .xsmall()
-                    .ghost()
-                    .icon(IconName::RefreshCw)
-                    .tooltip("Sync from OpenAPI")
-                    .on_click(cx.listener(|view, _, window, cx| view.sync_openapi(window, cx))),
+                icon_button("sync-openapi", IconName::RefreshCw).on_click(cx.listener(|view, _, window, cx| view.sync_openapi(window, cx))),
             )
             .child(
                 Button::new("collection-menu")
                     .xsmall()
                     .ghost()
-                    .icon(IconName::Ellipsis)
+                    .icon(Icon::new(IconName::Ellipsis))
                     .dropdown_menu(move |menu, _, _| collection_menu(menu, view.clone())),
             )
     }
@@ -100,7 +109,8 @@ impl ProjectView {
                     if !filter.is_empty() && inner.is_empty() && !folder.name().to_lowercase().contains(filter) {
                         continue;
                     }
-                    out.push(Row { path: folder.dir.clone(), name: folder.name(), method: None, depth, is_open });
+                    let count = count_requests(&folder.children);
+                    out.push(Row { path: folder.dir.clone(), name: folder.name(), method: None, depth, is_open, count });
                     out.extend(inner);
                 }
                 Item::Request(request) => {
@@ -109,43 +119,49 @@ impl ProjectView {
                     if !filter.is_empty() && !name.to_lowercase().contains(filter) && !url.contains(filter) {
                         continue;
                     }
-                    out.push(Row { path: request.doc.path.clone(), name, method: Some(request.method()), depth, is_open: false });
+                    out.push(Row { path: request.doc.path.clone(), name, method: Some(request.method()), depth, is_open: false, count: 0 });
                 }
             }
         }
     }
 
     fn render_row(&self, row: Row, active: Option<&Path>, cx: &mut Context<Self>) -> AnyElement {
-        let theme = cx.theme();
+        let palette = appearance::palette(cx);
+        let active_background = cx.theme().list_active;
         let is_active = active == Some(row.path.as_path());
         let is_folder = row.method.is_none();
         let path = row.path.clone();
-        let marker: AnyElement = match &row.method {
-            None => h_flex()
-                .gap_1()
-                .text_color(theme.muted_foreground)
-                .child(Icon::new(if row.is_open { IconName::ChevronDown } else { IconName::ChevronRight }).xsmall())
-                .child(Icon::new(if row.is_open { IconName::FolderOpen } else { IconName::FolderClosed }).xsmall())
+        let indent = row.depth as f32 * 14. + if is_folder { 8. } else { 26. };
+        let lead: AnyElement = match &row.method {
+            None => Icon::new(gpui_component::IconName::ChevronRight)
+                .size(dp(13.))
+                .text_color(palette.faint)
+                .when(row.is_open, |icon| icon.rotate(gpui::Radians(std::f32::consts::FRAC_PI_2)))
                 .into_any_element(),
-            Some(method) => method_label(method, cx).into_any_element(),
+            Some(method) => method_badge(method, cx).into_any_element(),
         };
         let view = cx.entity().downgrade();
         let menu_path = path.clone();
         h_flex()
             .id(ElementId::Name(SharedString::from(format!("row-{}", row.path.display()))))
             .w_full()
-            .h(rems(1.85))
-            .pl(dp(8. + row.depth as f32 * 14.))
-            .pr_2()
-            .gap_1p5()
+            .h(rems(2.05))
+            .pl(dp(indent))
+            .pr(dp(8.))
+            .gap(dp(8.))
             .items_center()
-            .text_sm()
-            .rounded_md()
+            .rounded(dp(8.))
+            .border_1()
             .cursor_pointer()
-            .when(is_active, |el| el.bg(theme.list_active).text_color(theme.foreground))
-            .when(!is_active, |el| el.hover(|el| el.bg(theme.list_hover)))
-            .child(marker)
-            .child(div().flex_1().min_w_0().truncate().child(row.name))
+            .text_size(rems(0.87))
+            .text_color(if is_folder || is_active { palette.text } else { palette.muted })
+            .when(is_active, |el| el.bg(active_background).border_color(gpui::Hsla { a: 0.35, ..palette.accent }))
+            .when(!is_active, |el| el.border_color(gpui::transparent_black()).hover(|el| el.bg(palette.hover).text_color(palette.text)))
+            .child(lead)
+            .child(div().flex_1().min_w_0().truncate().when(is_folder, |el| el.font_weight(gpui::FontWeight::MEDIUM)).child(row.name))
+            .when(is_folder && row.count > 0, |el| {
+                el.child(div().text_size(rems(0.72)).text_color(palette.faint).child(row.count.to_string()))
+            })
             .on_click(cx.listener(move |view, _: &ClickEvent, window, cx| {
                 if is_folder {
                     view.toggle_folder(&path, cx);
@@ -163,6 +179,16 @@ impl ProjectView {
         }
         cx.notify();
     }
+}
+
+fn count_requests(items: &[Item]) -> usize {
+    items
+        .iter()
+        .map(|item| match item {
+            Item::Folder(folder) => count_requests(&folder.children),
+            Item::Request(_) => 1,
+        })
+        .sum()
 }
 
 fn row_menu(menu: PopupMenu, view: gpui::WeakEntity<ProjectView>, path: PathBuf, is_folder: bool) -> PopupMenu {

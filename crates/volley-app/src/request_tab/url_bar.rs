@@ -1,99 +1,146 @@
 use gpui::prelude::FluentBuilder as _;
-use gpui::{Context, FontWeight, IntoElement, ParentElement as _, Styled, div, rems};
+use gpui::{
+    Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _, Styled, div, rems,
+};
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::Input;
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
-use gpui_component::{ActiveTheme as _, Disableable as _, IconName, Sizable as _, h_flex, v_flex};
+use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
+use gpui_kit_assets::IconName;
 
 use super::{METHODS, RequestTab};
-use crate::ui::ReportUnlessGone as _;
-use crate::ui::*;
+use crate::appearance::{self, MONO_FONT, dp};
+use crate::ui::{ReportUnlessGone as _, method_color};
 
 impl RequestTab {
     pub(super) fn render_url_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let method = self.method.clone();
-        let sending = self.sending.is_some();
-        let color = method_color(&method, cx);
-        let theme = cx.theme();
+        let palette = appearance::palette(cx);
+        let is_sending = self.sending.is_some();
         v_flex()
-            .gap_1()
-            .p_2()
-            .border_b_1()
-            .border_color(theme.border)
+            .px(dp(16.))
+            .pt(dp(14.))
+            .pb(dp(10.))
+            .gap(dp(8.))
             .child(
                 h_flex()
-                    .gap_2()
+                    .gap(dp(8.))
                     .items_center()
                     .child(
-                        Button::new("method")
-                            .small()
-                            .outline()
-                            .child(div().w(rems(3.6)).text_color(color).font_weight(FontWeight::BOLD).child(method.clone()))
-                            .dropdown_caret(true)
-                            .dropdown_menu({
-                                let tab = cx.entity().downgrade();
-                                move |menu, _, _| {
-                                    METHODS.iter().fold(menu, |menu, m| {
-                                        let tab = tab.clone();
-                                        menu.item(PopupMenuItem::new(*m).checked(*m == method).on_click(move |_, _, cx| {
-                                            tab.update(cx, |tab, cx| tab.set_method(m, cx)).report_unless_gone("change the method");
-                                        }))
-                                    })
-                                }
-                            }),
+                        h_flex()
+                            .flex_1()
+                            .min_w_0()
+                            .h(rems(2.75))
+                            .items_center()
+                            .rounded(dp(11.))
+                            .border_1()
+                            .border_color(palette.border)
+                            .bg(palette.raised)
+                            .overflow_hidden()
+                            .child(self.render_method_picker(cx))
+                            .child(
+                                div().flex_1().min_w_0().px(dp(4.)).font_family(MONO_FONT).child(Input::new(&self.url).appearance(false)),
+                            ),
                     )
-                    .child(div().flex_1().min_w_0().child(Input::new(&self.url).small()))
-                    .child(if sending {
-                        Button::new("cancel").small().label("Cancel").on_click(cx.listener(|tab, _, _, cx| tab.cancel(cx)))
-                    } else {
-                        Button::new("send")
-                            .small()
-                            .primary()
-                            .icon(IconName::Play)
-                            .label("Send")
-                            .tooltip("Send (Ctrl+Enter)")
-                            .on_click(cx.listener(|tab, _, window, cx| tab.send(window, cx)))
-                    })
+                    .child(self.render_send_button(is_sending, cx))
                     .child(
-                        Button::new("save")
-                            .small()
-                            .ghost()
-                            .label("Save")
-                            .tooltip("Save (Ctrl+S)")
-                            .disabled(!self.dirty)
+                        div()
+                            .id("save")
+                            .h(rems(2.75))
+                            .px(dp(14.))
+                            .flex()
+                            .items_center()
+                            .rounded(dp(11.))
+                            .border_1()
+                            .border_color(palette.border)
+                            .cursor_pointer()
+                            .font_weight(FontWeight::MEDIUM)
+                            .text_color(if self.dirty { palette.text } else { palette.faint })
+                            .hover(|el| el.bg(palette.hover))
+                            .child("Save")
                             .on_click(cx.listener(|tab, _, window, cx| tab.save(window, cx))),
                     ),
             )
             .child(
                 h_flex()
-                    .gap_2()
-                    .text_xs()
-                    .text_color(theme.muted_foreground)
-                    .child(div().truncate().child(self.preview.clone()))
+                    .pl(dp(4.))
+                    .gap(dp(8.))
+                    .items_center()
+                    .font_family(MONO_FONT)
+                    .text_size(rems(0.76))
+                    .text_color(palette.faint)
+                    .child(Icon::new(IconName::ArrowRight).xsmall())
+                    .child(div().min_w_0().truncate().child(self.preview.clone()))
                     .when(!self.missing.is_empty(), |el| {
-                        el.child(div().flex_none().text_color(theme.warning).child(format!("not set: {}", self.missing.join(", "))))
+                        el.child(div().flex_none().text_color(palette.warning).child(format!("not set: {}", self.missing.join(", "))))
                     }),
             )
-            .when(self.changed_on_disk, |el| {
-                el.child(
-                    h_flex()
-                        .gap_2()
-                        .items_center()
-                        .text_xs()
-                        .text_color(theme.warning)
-                        .child("The file changed on disk while you were editing it.")
-                        .child(
-                            Button::new("take-disk")
-                                .xsmall()
-                                .ghost()
-                                .label("Use the file")
-                                .on_click(cx.listener(|tab, _, window, cx| tab.revert(window, cx))),
-                        )
-                        .child(Button::new("keep-mine").xsmall().ghost().label("Keep mine").on_click(cx.listener(|tab, _, _, cx| {
-                            tab.changed_on_disk = false;
-                            cx.notify();
-                        }))),
-                )
+            .when(self.changed_on_disk, |el| el.child(self.render_disk_conflict(cx)))
+    }
+
+    fn render_method_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        let method = self.method.clone();
+        let tab = cx.entity().downgrade();
+        let label = h_flex()
+            .gap(dp(6.))
+            .items_center()
+            .font_family(MONO_FONT)
+            .text_size(rems(0.78))
+            .font_weight(FontWeight::BOLD)
+            .text_color(method_color(&method, cx))
+            .child(method.clone())
+            .child(Icon::new(gpui_component::IconName::ChevronDown).xsmall().text_color(palette.faint));
+        div().h_full().flex().items_center().border_r_1().border_color(palette.border).child(
+            Button::new("method").ghost().h_full().pl(dp(14.)).pr(dp(10.)).child(label).dropdown_menu(move |menu, _, _| {
+                METHODS.iter().fold(menu, |menu, candidate| {
+                    let tab = tab.clone();
+                    menu.item(PopupMenuItem::new(*candidate).checked(*candidate == method).on_click(move |_, _, cx| {
+                        tab.update(cx, |tab, cx| tab.set_method(candidate, cx)).report_unless_gone("change the method");
+                    }))
+                })
+            }),
+        )
+    }
+
+    fn render_send_button(&self, is_sending: bool, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        let label = if is_sending { "Cancel" } else { "Send" };
+        h_flex()
+            .id("send")
+            .h(rems(2.75))
+            .px(dp(18.))
+            .gap(dp(8.))
+            .items_center()
+            .rounded(dp(11.))
+            .cursor_pointer()
+            .font_weight(FontWeight::SEMIBOLD)
+            .when(is_sending, |el| el.bg(palette.raised).text_color(palette.text).border_1().border_color(palette.border))
+            .when(!is_sending, |el| el.bg(palette.accent).text_color(palette.accent_text).hover(|el| el.opacity(0.92)))
+            .child(label)
+            .when(!is_sending, |el| {
+                el.child(div().font_family(MONO_FONT).text_size(rems(0.7)).opacity(0.7).child(crate::workspace::shortcut("Enter")))
             })
+            .on_click(cx.listener(move |tab, _, window, cx| if is_sending { tab.cancel(cx) } else { tab.send(window, cx) }))
+    }
+
+    fn render_disk_conflict(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        h_flex()
+            .gap_2()
+            .items_center()
+            .text_xs()
+            .text_color(palette.warning)
+            .child("The file changed on disk while you were editing it.")
+            .child(
+                Button::new("take-disk")
+                    .xsmall()
+                    .ghost()
+                    .label("Use the file")
+                    .on_click(cx.listener(|tab, _, window, cx| tab.revert(window, cx))),
+            )
+            .child(Button::new("keep-mine").xsmall().ghost().label("Keep mine").on_click(cx.listener(|tab, _, _, cx| {
+                tab.changed_on_disk = false;
+                cx.notify();
+            })))
     }
 }

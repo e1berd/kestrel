@@ -158,7 +158,6 @@ impl KvTable {
 impl Render for KvTable {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let last = self.rows.len().saturating_sub(1);
-        let border = cx.theme().border;
         let muted = cx.theme().muted_foreground;
         v_flex().w_full().gap_1().children(self.rows.iter().enumerate().map(|(index, row)| {
             let blank = index == last;
@@ -186,8 +185,6 @@ impl Render for KvTable {
                             .on_click(cx.listener(move |table, _, window, cx| table.remove(index, window, cx))),
                     )
                 }))
-                .border_b_1()
-                .border_color(border)
                 .pb_1()
         }))
     }

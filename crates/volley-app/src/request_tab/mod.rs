@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use gpui::{AppContext as _, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, Styled, Subscription, Task, Window, div};
 use gpui_component::input::{EditorState, InputEvent, InputState};
-use gpui_component::{ActiveTheme as _, WindowExt as _, h_resizable, resizable_panel, v_flex};
+use gpui_component::{WindowExt as _, h_resizable, resizable_panel, v_flex};
 use volley_core::format::{Auth, AuthConfig, Body, RequestFile};
 use volley_core::{Document, Outcome};
 
@@ -10,28 +10,23 @@ use crate::kv_table::{KvChanged, KvTable};
 use crate::project::{Project, ProjectEvent};
 mod build;
 mod response;
+mod response_sections;
 mod sections;
 mod sending;
 mod url_bar;
 
 const METHODS: [&str; 7] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const BODY_KINDS: [(&str, &str); 7] = [
-    ("none", "No body"),
+    ("none", "None"),
     ("json", "JSON"),
     ("text", "Text"),
     ("xml", "XML"),
-    ("form-urlencoded", "Form URL encoded"),
-    ("multipart-form", "Multipart form"),
+    ("form-urlencoded", "Form"),
+    ("multipart-form", "Multipart"),
     ("graphql", "GraphQL"),
 ];
-const AUTH_MODES: [(&str, &str); 6] = [
-    ("inherit", "Inherit"),
-    ("none", "No auth"),
-    ("bearer", "Bearer token"),
-    ("basic", "Basic"),
-    ("apikey", "API key"),
-    ("oauth2", "OAuth 2.0"),
-];
+const AUTH_MODES: [(&str, &str); 6] =
+    [("inherit", "Inherit"), ("none", "None"), ("bearer", "Bearer"), ("basic", "Basic"), ("apikey", "API key"), ("oauth2", "OAuth 2.0")];
 const SCRIPT_KINDS: [(&str, &str); 3] = [("before-request", "Before request"), ("after-response", "After response"), ("tests", "Tests")];
 const BODY_SHOWN: usize = 2 * 1024 * 1024;
 fn auth_fields(mode: &str) -> &'static [(&'static str, &'static str)] {
@@ -368,10 +363,14 @@ fn code_editor<T: 'static>(language: &'static str, text: String, window: &mut Wi
 }
 impl Render for RequestTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex().size_full().child(self.render_url_bar(cx)).child(div().flex_1().min_h_0().child(
-            h_resizable("request-response").child(resizable_panel().child(self.render_request(window, cx))).child(
-                resizable_panel().child(div().size_full().border_l_1().border_color(cx.theme().border).child(self.render_response(cx))),
+        let palette = crate::appearance::palette(cx);
+        v_flex().size_full().child(self.render_url_bar(cx)).child(
+            div().flex_1().min_h_0().border_t_1().border_color(palette.border_soft).child(
+                h_resizable("request-response").child(resizable_panel().child(self.render_request(window, cx))).child(
+                    resizable_panel()
+                        .child(div().size_full().border_l_1().border_color(palette.border_soft).child(self.render_response(cx))),
+                ),
             ),
-        ))
+        )
     }
 }

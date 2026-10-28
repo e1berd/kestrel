@@ -5,9 +5,8 @@ use gpui::{
     AnyElement, App, Div, ElementId, Entity, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, div, rems,
 };
-use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::{Input, InputState};
-use gpui_component::{ActiveTheme as _, Sizable as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use volley_core::report::report_error;
 
 use crate::appearance::{self, MONO_FONT, dp};
@@ -16,30 +15,125 @@ pub fn method_color(method: &str, cx: &App) -> Hsla {
     appearance::palette(cx).methods.of(method)
 }
 
-pub fn method_label(method: &str, cx: &App) -> impl IntoElement {
-    let short = match method {
-        "DELETE" => "DEL",
-        "OPTIONS" => "OPT",
-        other => other,
-    };
-    div()
-        .w(rems(2.9))
-        .flex_none()
-        .text_xs()
-        .font_family(MONO_FONT)
-        .font_weight(FontWeight::BOLD)
-        .text_color(method_color(method, cx))
-        .child(SharedString::from(short.to_string()))
+fn short_method(method: &str) -> String {
+    match method {
+        "DELETE" => "DEL".into(),
+        "OPTIONS" => "OPT".into(),
+        other => other.to_string(),
+    }
 }
 
-pub fn status_color(status: u16, cx: &App) -> Hsla {
+pub fn method_badge(method: &str, cx: &App) -> impl IntoElement {
+    let color = method_color(method, cx);
+    div()
+        .flex_none()
+        .w(rems(3.1))
+        .py(rems(0.06))
+        .rounded(dp(6.))
+        .text_center()
+        .font_family(MONO_FONT)
+        .text_size(rems(0.66))
+        .font_weight(FontWeight::BOLD)
+        .text_color(color)
+        .bg(appearance::palette(cx).tint(color))
+        .child(short_method(method))
+}
+
+pub fn method_label(method: &str, cx: &App) -> impl IntoElement {
+    div()
+        .flex_none()
+        .font_family(MONO_FONT)
+        .text_size(rems(0.66))
+        .font_weight(FontWeight::BOLD)
+        .text_color(method_color(method, cx))
+        .child(short_method(method))
+}
+
+pub fn count_badge(count: usize, cx: &App) -> impl IntoElement {
     let palette = appearance::palette(cx);
-    match status {
-        200..=299 => palette.success,
-        300..=399 => palette.info,
-        400..=499 => palette.warning,
-        _ => palette.danger,
-    }
+    div().px(rems(0.4)).rounded_full().text_size(rems(0.7)).bg(palette.hover).text_color(palette.muted).child(count.to_string())
+}
+
+pub fn pill_tab(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    count: Option<usize>,
+    is_active: bool,
+    cx: &App,
+) -> gpui::Stateful<Div> {
+    let palette = appearance::palette(cx);
+    h_flex()
+        .id(id)
+        .flex_none()
+        .gap(rems(0.4))
+        .px(rems(0.65))
+        .py(rems(0.38))
+        .rounded(dp(8.))
+        .cursor_pointer()
+        .text_size(rems(0.82))
+        .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
+        .text_color(if is_active { palette.text } else { palette.muted })
+        .when(is_active, |el| el.bg(palette.raised))
+        .when(!is_active, |el| el.hover(|el| el.bg(palette.hover)))
+        .child(label.into())
+        .when_some(count.filter(|n| *n > 0), |el, n| el.child(count_badge(n, cx)))
+}
+
+pub fn chip(text: impl Into<SharedString>, color: Hsla, cx: &App) -> Div {
+    let palette = appearance::palette(cx);
+    h_flex()
+        .flex_none()
+        .gap(rems(0.38))
+        .px(rems(0.65))
+        .py(rems(0.25))
+        .rounded_full()
+        .bg(palette.tint(color))
+        .text_color(color)
+        .text_size(rems(0.78))
+        .font_weight(FontWeight::SEMIBOLD)
+        .child(div().size(dp(6.)).rounded_full().bg(color))
+        .child(text.into())
+}
+
+pub fn segmented<T: Clone + PartialEq + 'static>(
+    id: &str,
+    options: Vec<(T, String)>,
+    selected: &T,
+    on_pick: impl Fn(T, &mut Window, &mut App) + Clone + 'static,
+    cx: &App,
+) -> impl IntoElement {
+    let palette = appearance::palette(cx);
+    h_flex().flex_none().flex_wrap().p(dp(3.)).gap(dp(2.)).rounded(dp(9.)).bg(palette.raised).children(options.into_iter().enumerate().map(
+        |(index, (value, label))| {
+            let is_selected = &value == selected;
+            let on_pick = on_pick.clone();
+            div()
+                .id(ElementId::NamedInteger(SharedString::from(id.to_string()), index as u64))
+                .px(rems(0.7))
+                .py(rems(0.28))
+                .rounded(dp(7.))
+                .cursor_pointer()
+                .text_size(rems(0.8))
+                .font_weight(if is_selected { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
+                .when(is_selected, |el| el.bg(palette.accent).text_color(palette.accent_text))
+                .when(!is_selected, |el| el.text_color(palette.muted).hover(|el| el.bg(palette.hover)))
+                .child(label)
+                .on_click(move |_, window, cx| on_pick(value.clone(), window, cx))
+        },
+    ))
+}
+
+pub fn code_box(content: impl IntoElement, cx: &App) -> Div {
+    let palette = appearance::palette(cx);
+    div()
+        .size_full()
+        .rounded(dp(10.))
+        .overflow_hidden()
+        .border_1()
+        .border_color(palette.border_soft)
+        .bg(palette.code)
+        .py(dp(6.))
+        .child(content)
 }
 
 pub fn format_size(bytes: usize) -> String {
@@ -56,7 +150,11 @@ pub fn format_duration(elapsed: Duration) -> String {
 }
 
 pub fn hint(text: &str, cx: &App) -> Div {
-    div().text_xs().text_color(cx.theme().muted_foreground).child(text.to_string())
+    div().text_xs().text_color(appearance::palette(cx).faint).child(text.to_string())
+}
+
+pub fn eyebrow(text: &str, cx: &App) -> Div {
+    div().text_size(rems(0.7)).font_weight(FontWeight::SEMIBOLD).text_color(appearance::palette(cx).faint).child(text.to_uppercase())
 }
 
 pub fn scroll(id: &'static str, content: AnyElement) -> AnyElement {
@@ -68,38 +166,17 @@ pub fn labelled_input(label: &str, input: &Entity<InputState>, cx: &App) -> impl
         .gap_2()
         .items_center()
         .child(div().w(dp(140.)).flex_none().text_xs().text_color(cx.theme().muted_foreground).child(label.to_string()))
-        .child(div().flex_1().child(Input::new(input).small()))
+        .child(div().flex_1().child(Input::new(input)))
 }
 
 pub fn name_value_rows(rows: Vec<(String, String)>, cx: &App) -> impl IntoElement {
-    v_flex().gap_1().text_xs().children(rows.into_iter().map(|(name, value)| {
+    let palette = appearance::palette(cx);
+    v_flex().gap_1p5().text_xs().children(rows.into_iter().map(|(name, value)| {
         h_flex()
             .gap_3()
-            .child(div().w(dp(200.)).flex_none().text_color(cx.theme().muted_foreground).child(name))
+            .child(div().w(dp(200.)).flex_none().text_color(palette.muted).child(name))
             .child(div().flex_1().min_w_0().font_family(MONO_FONT).child(value))
     }))
-}
-
-pub fn segmented<T: Clone + PartialEq + 'static>(
-    id: &str,
-    options: Vec<(T, String)>,
-    selected: &T,
-    on_pick: impl Fn(T, &mut Window, &mut App) + Clone + 'static,
-) -> impl IntoElement {
-    h_flex().gap_1().flex_wrap().children(options.into_iter().enumerate().map(|(index, (value, label))| {
-        let is_selected = &value == selected;
-        let on_pick = on_pick.clone();
-        Button::new(ElementId::NamedInteger(SharedString::from(id.to_string()), index as u64))
-            .small()
-            .label(label)
-            .when(is_selected, |button| button.primary())
-            .when(!is_selected, |button| button.outline())
-            .on_click(move |_, window, cx| on_pick(value.clone(), window, cx))
-    }))
-}
-
-pub fn section_title(text: &str) -> impl IntoElement {
-    div().text_sm().font_weight(FontWeight::SEMIBOLD).child(text.to_string())
 }
 
 pub trait ReportUnlessGone {

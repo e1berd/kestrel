@@ -58,8 +58,8 @@ pub fn reload_schemes(cx: &mut App) {
     apply(None, cx);
 }
 
-pub fn palette(cx: &App) -> &Palette {
-    &cx.global::<ActivePalette>().0
+pub fn palette(cx: &App) -> Palette {
+    cx.global::<ActivePalette>().0.clone()
 }
 
 pub fn apply(window: Option<&mut Window>, cx: &mut App) {
