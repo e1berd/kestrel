@@ -9,7 +9,6 @@ gpui_kit_assets::icon_assets!(
         Clock,
         Command,
         Send,
-        Bird,
         Search,
         CircleCheck,
         CircleX,
@@ -31,10 +30,16 @@ gpui_kit_assets::icon_assets!(
     ]
 );
 
+pub const LOGO: &str = "brand/kestrel.svg";
+pub const WINDOW_ICON_PNG: &[u8] = include_bytes!("../../../packaging/linux/icons/kestrel-128.png");
+
 pub struct AppAssets;
 
 impl AssetSource for AppAssets {
     fn load(&self, path: &str) -> gpui::Result<Option<Cow<'static, [u8]>>> {
+        if path == LOGO {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/brand/kestrel.svg"))));
+        }
         if let Some(bytes) = ExtraIcons.load(path)? {
             return Ok(Some(bytes));
         }

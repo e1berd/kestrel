@@ -80,7 +80,7 @@ impl SettingsView {
                     .cursor_pointer()
                     .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
                     .text_color(if is_active { palette.text } else { palette.muted })
-                    .when(is_active, |el| el.bg(palette.raised))
+                    .when(is_active, |el| el.bg(palette.raised).shadow(appearance::elevation::lifted(cx)))
                     .when(!is_active, |el| el.hover(|el| el.bg(palette.hover)))
                     .child(*label)
                     .on_click(cx.listener(move |view, _, _, cx| {

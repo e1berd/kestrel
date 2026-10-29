@@ -25,6 +25,7 @@ gpui = { package = "gpui-pre", version = "=0.3.10" }
 gpui_platform = { package = "gpui-pre-platform", version = "=0.3.10" }
 gpui-component = { version = "0.8.1", features = ["tree-sitter", "tree-sitter-javascript", "tree-sitter-html"] }
 gpui-kit-assets = "0.8.1"
+image = { version = "0.25.10", default-features = false, features = ["png"] }
 # reqwest and gpui both bring rustls; main() picks ring before the first TLS connection.
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 

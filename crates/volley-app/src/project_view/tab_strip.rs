@@ -11,8 +11,18 @@ use crate::ui::method_label;
 impl ProjectView {
     pub(super) fn render_tab_strip(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
-        h_flex().id("tabs").flex_none().px(dp(8.)).pt(dp(8.)).gap(dp(4.)).overflow_x_scroll().children(self.tabs.iter().enumerate().map(
-            |(index, tab)| {
+        let shadow = appearance::elevation::lifted(cx);
+        h_flex()
+            .id("tabs")
+            .flex_none()
+            .px(dp(8.))
+            .py(dp(7.))
+            .gap(dp(4.))
+            .border_b_1()
+            .border_color(palette.border_soft)
+            .bg(palette.code)
+            .overflow_x_scroll()
+            .children(self.tabs.iter().enumerate().map(|(index, tab)| {
                 let tab = tab.read(cx);
                 let is_active = index == self.active;
                 h_flex()
@@ -28,7 +38,9 @@ impl ProjectView {
                     .border_1()
                     .cursor_pointer()
                     .text_size(rems(0.84))
-                    .when(is_active, |el| el.bg(palette.raised).border_color(palette.border).text_color(palette.text))
+                    .when(is_active, |el| {
+                        el.bg(palette.raised).border_color(palette.border_soft).text_color(palette.text).shadow(shadow.clone())
+                    })
                     .when(!is_active, |el| {
                         el.border_color(gpui::transparent_black()).text_color(palette.muted).hover(|el| el.bg(palette.hover))
                     })
@@ -56,7 +68,6 @@ impl ProjectView {
                     )
                     .on_mouse_down(MouseButton::Middle, cx.listener(move |view, _, window, cx| view.close_tab(index, window, cx)))
                     .on_click(cx.listener(move |view, _, _, cx| view.activate_tab(index, cx)))
-            },
-        ))
+            }))
     }
 }

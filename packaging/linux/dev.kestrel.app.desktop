@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Kestrel
+GenericName=API Client
+Comment=Free API client that keeps requests as files in git
+Exec=kestrel %f
+Icon=dev.kestrel.app
+Terminal=false
+Categories=Development;WebDevelopment;
+Keywords=api;http;rest;graphql;openapi;bruno;postman;
+StartupWMClass=dev.kestrel.app
+StartupNotify=true

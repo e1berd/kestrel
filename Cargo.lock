@@ -7525,6 +7525,7 @@ dependencies = [
  "gpui-kit-assets",
  "gpui-pre",
  "gpui-pre-platform",
+ "image",
  "indexmap",
  "notify",
  "rustls",

@@ -6,13 +6,13 @@ use gpui::{
     StatefulInteractiveElement as _, Styled as _, Subscription, WeakEntity, Window, div, rems,
 };
 use gpui_component::input::{Input, InputEvent, InputState};
-use gpui_component::{Icon, Sizable as _, WindowExt as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, Icon, Sizable as _, WindowExt as _, h_flex, v_flex};
 use gpui_kit_assets::IconName;
 
 use super::Workspace;
 use crate::appearance::{self, dp};
 use crate::prefs::ThemeChoice;
-use crate::ui::{ReportUnlessGone as _, hint, method_badge};
+use crate::ui::{ReportUnlessGone as _, hint, keys, method_badge};
 
 type Command = fn(&mut Workspace, &mut Window, &mut Context<Workspace>);
 
@@ -162,37 +162,57 @@ impl CommandPalette {
 impl Render for CommandPalette {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
+        let selected_background = cx.theme().list_active;
         let matches = self.matches(cx);
         let selected = self.selected.min(matches.len().saturating_sub(1));
         v_flex()
-            .gap_2()
+            .gap(dp(10.))
             .on_key_down(cx.listener(|palette, event: &KeyDownEvent, _, cx| palette.move_selection(event, cx)))
             .child(Input::new(&self.query).large().prefix(Icon::new(IconName::Search).small()))
             .when(matches.is_empty(), |el| el.child(div().p_3().child(hint("Nothing matches.", cx))))
             .child(v_flex().gap(dp(2.)).children(matches.into_iter().enumerate().map(|(index, entry)| {
                 let is_selected = index == selected;
+                let is_command = entry.method.is_none();
                 h_flex()
                     .id(("palette-entry", index))
-                    .h(rems(2.3))
+                    .h(rems(2.4))
                     .px(dp(10.))
                     .gap(dp(10.))
                     .items_center()
-                    .rounded(dp(8.))
+                    .rounded(dp(9.))
                     .cursor_pointer()
-                    .when(is_selected, |el| el.bg(palette.raised))
-                    .hover(|el| el.bg(palette.hover))
+                    .when(is_selected, |el| el.bg(selected_background))
+                    .when(!is_selected, |el| el.hover(|el| el.bg(palette.hover)))
                     .child(match &entry.method {
                         Some(method) => method_badge(method, cx).into_any_element(),
-                        None => div()
-                            .w(rems(3.1))
-                            .flex()
-                            .justify_center()
-                            .child(Icon::new(IconName::Command).small().text_color(palette.faint))
-                            .into_any_element(),
+                        None => div().w(rems(2.2)).child(Icon::new(IconName::Command).small().text_color(palette.faint)).into_any_element(),
                     })
                     .child(div().flex_none().text_color(palette.text).child(entry.label))
-                    .child(div().flex_1().min_w_0().truncate().text_xs().text_color(palette.faint).child(entry.detail))
+                    .child(div().flex_1())
+                    .when(is_command && !entry.detail.is_empty(), |el| el.child(keys(&entry.detail, cx)))
+                    .when(!is_command, |el| {
+                        el.child(div().min_w_0().truncate().text_size(rems(0.76)).text_color(palette.faint).child(entry.detail))
+                    })
                     .on_click(cx.listener(move |palette, _, window, cx| palette.run(index, window, cx)))
             })))
+            .child(self.render_footer(cx))
+    }
+}
+
+impl CommandPalette {
+    fn render_footer(&self, cx: &App) -> impl IntoElement + use<> {
+        let palette = appearance::palette(cx);
+        let hint_pair =
+            |combination: &str, action: &str| h_flex().gap(dp(6.)).items_center().child(keys(combination, cx)).child(action.to_string());
+        h_flex()
+            .pt(dp(10.))
+            .gap(dp(16.))
+            .border_t_1()
+            .border_color(palette.border_soft)
+            .text_size(rems(0.74))
+            .text_color(palette.faint)
+            .child(hint_pair("↑ ↓", "move"))
+            .child(hint_pair("Enter", "open"))
+            .child(hint_pair("Esc", "close"))
     }
 }

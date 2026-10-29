@@ -1,20 +1,13 @@
 use std::path::{Path, PathBuf};
 
-use gpui::prelude::FluentBuilder as _;
-use gpui::{
-    AnyElement, AppContext as _, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, PathPromptOptions,
-    StatefulInteractiveElement as _, Styled as _, Window, div,
-};
-use gpui_component::button::{Button, ButtonVariants as _};
+use gpui::{AppContext as _, Context, PathPromptOptions, Window};
+use gpui_component::WindowExt as _;
 use gpui_component::notification::Notification;
-use gpui_component::{ActiveTheme as _, IconName, WindowExt as _, h_flex, v_flex};
 use volley_core::Collection;
 use volley_openapi::GroupBy;
 
 use super::Workspace;
-use crate::appearance::dp;
-use crate::prefs::Prefs;
-use crate::ui::{ReportUnlessGone as _, hint};
+use crate::ui::ReportUnlessGone as _;
 
 fn folder_prompt(prompt: &str) -> PathPromptOptions {
     PathPromptOptions { files: false, directories: true, multiple: false, prompt: Some(prompt.to_string().into()) }
@@ -73,60 +66,6 @@ impl Workspace {
                 .report_unless_gone("import an OpenAPI spec");
         })
         .detach();
-    }
-
-    pub(super) fn render_welcome(&self, cx: &mut Context<Self>) -> AnyElement {
-        let recent: Vec<PathBuf> =
-            Prefs::load().recent.into_iter().filter(|path| path.join(volley_core::collection::COLLECTION_FILE).is_file()).collect();
-        v_flex()
-            .size_full()
-            .items_center()
-            .justify_center()
-            .gap_4()
-            .child(div().text_3xl().font_weight(FontWeight::BOLD).text_color(cx.theme().primary).child("Kestrel"))
-            .child(hint("A free API client that keeps your requests as files in git.", cx).text_sm())
-            .child(
-                h_flex()
-                    .gap_2()
-                    .child(
-                        Button::new("welcome-open")
-                            .primary()
-                            .icon(IconName::FolderOpen)
-                            .label("Open collection")
-                            .on_click(cx.listener(|workspace, _, window, cx| workspace.prompt_open(window, cx))),
-                    )
-                    .child(
-                        Button::new("welcome-new")
-                            .outline()
-                            .icon(IconName::Plus)
-                            .label("New collection")
-                            .on_click(cx.listener(|workspace, _, window, cx| workspace.prompt_new_collection(window, cx))),
-                    )
-                    .child(
-                        Button::new("welcome-import")
-                            .outline()
-                            .icon(IconName::FileText)
-                            .label("Import OpenAPI")
-                            .on_click(cx.listener(|workspace, _, window, cx| workspace.prompt_import(window, cx))),
-                    ),
-            )
-            .when(!recent.is_empty(), |el| el.child(self.render_recent(recent, cx)))
-            .into_any_element()
-    }
-
-    fn render_recent(&self, recent: Vec<PathBuf>, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex().w(dp(560.)).gap_1().pt_4().child(hint("Recent", cx)).children(recent.into_iter().enumerate().map(|(index, path)| {
-            h_flex()
-                .id(("recent", index))
-                .px_3()
-                .py_1p5()
-                .rounded_md()
-                .cursor_pointer()
-                .text_sm()
-                .hover(|el| el.bg(cx.theme().list_hover))
-                .child(path.display().to_string())
-                .on_click(cx.listener(move |workspace, _, window, cx| workspace.open_collection(&path, window, cx)))
-        }))
     }
 }
 

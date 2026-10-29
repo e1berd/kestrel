@@ -42,7 +42,8 @@ fn main() {
         let opened = cx.open_window(
             WindowOptions {
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
-                app_id: Some("dev.kestrel.app".into()),
+                app_id: Some(APP_ID.into()),
+                icon: window_icon(),
                 window_decorations: Some(WindowDecorations::Client),
                 window_min_size: Some(size(dp(860.), dp(520.))),
                 ..TitleBar::window_options()
@@ -59,6 +60,18 @@ fn main() {
         }
         cx.activate(true);
     });
+}
+
+const APP_ID: &str = "dev.kestrel.app";
+
+fn window_icon() -> Option<std::sync::Arc<image::RgbaImage>> {
+    match image::load_from_memory_with_format(assets::WINDOW_ICON_PNG, image::ImageFormat::Png) {
+        Ok(icon) => Some(std::sync::Arc::new(icon.into_rgba8())),
+        Err(error) => {
+            report_error("decode the window icon", error);
+            None
+        }
+    }
 }
 
 fn bind_keys(cx: &mut App) {

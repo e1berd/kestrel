@@ -18,8 +18,8 @@ impl Workspace {
             .w(dp(52.))
             .h_full()
             .flex_none()
-            .pt(dp(6.))
-            .gap(dp(10.))
+            .pt(dp(8.))
+            .gap(dp(8.))
             .items_center()
             .children((0..self.views.len()).map(|index| self.render_project_badge(index, cx)))
             .child(self.render_open_menu(cx))
@@ -35,21 +35,25 @@ impl Workspace {
         let tint = badge_tint(&name, theme);
         let workspace = cx.entity().downgrade();
         let tooltip = format!("{name}\n{}", root.display());
-        div()
+        let palette = crate::appearance::palette(cx);
+        let monogram = div()
             .id(("project", index))
             .relative()
-            .size(dp(36.))
+            .size(dp(34.))
             .flex()
             .items_center()
             .justify_center()
-            .rounded(dp(11.))
+            .rounded(dp(10.))
+            .border_1()
             .cursor_pointer()
-            .text_sm()
+            .text_size(gpui::rems(0.78))
             .font_weight(FontWeight::SEMIBOLD)
             .when(is_active, |el| {
-                el.bg(theme.primary).text_color(theme.primary_foreground).border_2().border_color(gpui::Hsla { a: 0.45, ..theme.primary })
+                el.bg(palette.raised).border_color(palette.border).text_color(palette.text).shadow(crate::appearance::elevation::lifted(cx))
             })
-            .when(!is_active, |el| el.bg(tint).text_color(theme.foreground).hover(|el| el.bg(mix(tint, theme.primary, 0.25))))
+            .when(!is_active, |el| {
+                el.bg(tint).border_color(gpui::transparent_black()).text_color(palette.muted).hover(|el| el.text_color(palette.text))
+            })
             .child(initials(&name))
             .when(has_unsaved, |el| {
                 el.child(
@@ -73,7 +77,14 @@ impl Workspace {
                     close.update(cx, |workspace, cx| workspace.close_project(index, window, cx)).report_unless_gone("close a project");
                 }))
                 .item(PopupMenuItem::new("Show in file manager").on_click(move |_, _, cx| cx.reveal_path(&root)))
-            })
+            });
+        div()
+            .relative()
+            .w_full()
+            .flex()
+            .justify_center()
+            .when(is_active, |el| el.child(div().absolute().left_0().top(dp(8.)).w(dp(3.)).h(dp(18.)).rounded_r(dp(3.)).bg(palette.accent)))
+            .child(monogram)
             .into_any_element()
     }
 
@@ -108,7 +119,7 @@ fn initials(name: &str) -> String {
 fn badge_tint(name: &str, theme: &Theme) -> Hsla {
     let hue = name.bytes().fold(7u32, |hash, byte| hash.wrapping_mul(31).wrapping_add(byte as u32)) % 360;
     let hue_color = Hsla { h: hue as f32 / 360., s: 0.45, l: if theme.is_dark() { 0.45 } else { 0.6 }, a: 1. };
-    mix(theme.title_bar, hue_color, 0.28)
+    mix(theme.title_bar, hue_color, 0.18)
 }
 
 #[cfg(test)]

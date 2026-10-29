@@ -25,6 +25,8 @@ Rust stable (see `rust-toolchain.toml`). On Linux GPUI needs Vulkan, X11/Wayland
 cargo run --release
 ```
 
+On Linux, `packaging/linux/install.sh` builds a release, puts `kestrel` in `~/.local/bin` and adds the app with its icon to the application menu.
+
 `cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrel-cli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds both into `target/release/`.
 
 ## Use

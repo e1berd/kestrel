@@ -1,7 +1,7 @@
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _,
-    Styled as _, div, rems,
+    Styled as _, div, img, rems,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -10,9 +10,10 @@ use gpui_kit_assets::IconName;
 
 use super::Workspace;
 use super::command_palette;
-use crate::appearance::{self, MONO_FONT, dp};
+use crate::appearance::{self, dp};
+use crate::assets;
 use crate::settings;
-use crate::ui::ReportUnlessGone as _;
+use crate::ui::{ReportUnlessGone as _, keys};
 
 impl Workspace {
     pub(super) fn render_title(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -29,16 +30,7 @@ impl Workspace {
                     .min_w(dp(220.))
                     .gap_2()
                     .items_center()
-                    .child(
-                        div()
-                            .size(dp(22.))
-                            .rounded(dp(7.))
-                            .bg(palette.accent)
-                            .flex()
-                            .items_center()
-                            .justify_center()
-                            .child(Icon::new(IconName::Bird).size(dp(14.)).text_color(palette.accent_text)),
-                    )
+                    .child(img(assets::LOGO).size(dp(20.)).flex_none())
                     .child(div().font_weight(FontWeight::SEMIBOLD).child("Kestrel"))
                     .when_some(project_name, |el, name| {
                         el.child(div().text_color(palette.faint).child("/")).child(div().text_color(palette.muted).child(name))
@@ -49,7 +41,7 @@ impl Workspace {
             .child(
                 div()
                     .id("title-settings")
-                    .size(dp(30.))
+                    .size(dp(26.))
                     .rounded(dp(8.))
                     .flex()
                     .items_center()
@@ -68,12 +60,12 @@ impl Workspace {
         h_flex()
             .id("command-search")
             .w_full()
-            .max_w(dp(520.))
-            .h(dp(32.))
+            .max_w(dp(480.))
+            .h(dp(26.))
             .px(dp(10.))
             .gap_2()
             .items_center()
-            .rounded(dp(9.))
+            .rounded(dp(8.))
             .border_1()
             .border_color(palette.border)
             .bg(palette.background)
@@ -81,18 +73,8 @@ impl Workspace {
             .cursor_pointer()
             .hover(|el| el.border_color(palette.muted))
             .child(Icon::new(IconName::Search).small())
-            .child(div().flex_1().child("Find a request or a command"))
-            .child(
-                div()
-                    .px(dp(6.))
-                    .py(dp(1.))
-                    .rounded(dp(5.))
-                    .bg(palette.raised)
-                    .font_family(MONO_FONT)
-                    .text_size(rems(0.7))
-                    .text_color(palette.muted)
-                    .child(shortcut("K")),
-            )
+            .child(div().flex_1().text_size(rems(0.84)).child("Find a request or a command"))
+            .child(keys(&shortcut("K"), cx))
             .on_click(move |_, window, cx| {
                 workspace
                     .update(cx, |workspace, cx| command_palette::open(workspace, window, cx))
@@ -119,8 +101,8 @@ impl Workspace {
             .child(Icon::new(gpui_component::IconName::ChevronDown).xsmall().text_color(palette.faint));
         Button::new("environment")
             .ghost()
-            .h(dp(30.))
-            .px(dp(11.))
+            .h(dp(26.))
+            .px(dp(10.))
             .rounded_full()
             .border_1()
             .border_color(palette.border)

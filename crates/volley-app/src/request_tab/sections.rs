@@ -7,7 +7,7 @@ use volley_core::Plan;
 
 use super::{AUTH_MODES, BODY_KINDS, RequestTab, SCRIPT_KINDS, SECTIONS, Section};
 use crate::appearance::dp;
-use crate::ui::{ReportUnlessGone as _, code_box, hint, labelled_input, pill_tab, scroll, segmented};
+use crate::ui::{ReportUnlessGone as _, code_box, hint, labelled_input, scroll, section_tab, section_tab_strip, segmented};
 
 impl RequestTab {
     fn section_title(&self, section: Section, cx: &App) -> (String, Option<usize>) {
@@ -28,17 +28,17 @@ impl RequestTab {
     }
 
     pub(super) fn render_request(&self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
-        let pills =
-            h_flex().flex_wrap().px(dp(12.)).pt(dp(10.)).gap(dp(2.)).children(SECTIONS.iter().enumerate().map(|(index, section)| {
-                let (label, count) = self.section_title(*section, cx);
-                let section = *section;
-                pill_tab(("request-section", index), label, count, section == self.section, cx).on_click(cx.listener(
-                    move |tab, _, _, cx| {
-                        tab.section = section;
-                        cx.notify();
-                    },
-                ))
-            }));
+        let tabs = SECTIONS.iter().enumerate().map(|(index, section)| {
+            let (label, count) = self.section_title(*section, cx);
+            let section = *section;
+            section_tab(("request-section", index), label, count, section == self.section, cx).on_click(cx.listener(
+                move |tab, _, _, cx| {
+                    tab.section = section;
+                    cx.notify();
+                },
+            ))
+        });
+        let tabs: Vec<_> = tabs.collect();
         let content: AnyElement = match self.section {
             Section::Params => scroll("params-scroll", self.params.clone().into_any_element()),
             Section::Headers => scroll("headers-scroll", self.headers.clone().into_any_element()),
@@ -55,8 +55,8 @@ impl RequestTab {
         };
         v_flex()
             .size_full()
-            .child(pills)
-            .child(div().flex_1().min_h_0().px(dp(14.)).pt(dp(12.)).pb(dp(14.)).child(content))
+            .child(section_tab_strip("request-sections", tabs, cx))
+            .child(div().flex_1().min_h_0().px(dp(16.)).pt(dp(14.)).pb(dp(16.)).child(content))
             .into_any_element()
     }
 
@@ -84,7 +84,12 @@ impl RequestTab {
                 .into_any_element(),
             _ => code_box(Editor::new(&self.body).bordered(false).h_full(), cx).into_any_element(),
         };
-        v_flex().size_full().gap(dp(12.)).child(h_flex().child(picker)).child(div().flex_1().min_h_0().child(content)).into_any_element()
+        v_flex()
+            .size_full()
+            .gap(dp(12.))
+            .child(h_flex().min_w_0().child(picker))
+            .child(div().flex_1().min_h_0().child(content))
+            .into_any_element()
     }
 
     pub(super) fn render_auth(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
@@ -128,7 +133,7 @@ impl RequestTab {
                 .into_any_element(),
             _ => fields().into_any_element(),
         };
-        v_flex().gap(dp(14.)).child(h_flex().child(picker)).child(body).into_any_element()
+        v_flex().gap(dp(14.)).child(h_flex().min_w_0().child(picker)).child(body).into_any_element()
     }
 
     pub(super) fn render_scripts(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -158,7 +163,7 @@ impl RequestTab {
         v_flex()
             .size_full()
             .gap(dp(12.))
-            .child(h_flex().child(picker))
+            .child(h_flex().min_w_0().child(picker))
             .child(div().flex_1().min_h_0().child(code_box(Editor::new(editor).bordered(false).h_full(), cx)))
             .child(hint("bru, req, res, test(), expect() and require('jsonwebtoken') work as in Bruno.", cx))
             .into_any_element()

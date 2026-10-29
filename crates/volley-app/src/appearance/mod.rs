@@ -1,3 +1,4 @@
+pub mod elevation;
 mod expand;
 pub mod palette;
 pub mod zoom;
@@ -88,9 +89,9 @@ pub fn apply(window: Option<&mut Window>, cx: &mut App) {
         theme.mono_font_family = MONO_FONT.into();
         theme.font_size = px(zoom::BASE_REM * zoom::zoom() * text);
         theme.mono_font_size = px(prefs.code_font_size as f32 * zoom::zoom());
-        theme.radius = dp(6.);
-        theme.radius_lg = dp(10.);
-        theme.shadow = false;
+        theme.radius = dp(8.);
+        theme.radius_lg = dp(12.);
+        theme.shadow = true;
         theme.highlight_theme = expand::editor_colors(&theme.highlight_theme, &palette);
     });
     cx.set_global(ActivePalette(palette));

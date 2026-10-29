@@ -24,18 +24,13 @@ fn short_method(method: &str) -> String {
 }
 
 pub fn method_badge(method: &str, cx: &App) -> impl IntoElement {
-    let color = method_color(method, cx);
     div()
         .flex_none()
-        .w(rems(3.1))
-        .py(rems(0.06))
-        .rounded(dp(6.))
-        .text_center()
+        .w(rems(2.2))
         .font_family(MONO_FONT)
-        .text_size(rems(0.66))
+        .text_size(rems(0.64))
         .font_weight(FontWeight::BOLD)
-        .text_color(color)
-        .bg(appearance::palette(cx).tint(color))
+        .text_color(method_color(method, cx))
         .child(short_method(method))
 }
 
@@ -54,7 +49,7 @@ pub fn count_badge(count: usize, cx: &App) -> impl IntoElement {
     div().px(rems(0.4)).rounded_full().text_size(rems(0.7)).bg(palette.hover).text_color(palette.muted).child(count.to_string())
 }
 
-pub fn pill_tab(
+pub fn section_tab(
     id: impl Into<ElementId>,
     label: impl Into<SharedString>,
     count: Option<usize>,
@@ -65,18 +60,69 @@ pub fn pill_tab(
     h_flex()
         .id(id)
         .flex_none()
+        .h_full()
         .gap(rems(0.4))
-        .px(rems(0.65))
-        .py(rems(0.38))
-        .rounded(dp(8.))
+        .px(rems(0.15))
+        .items_center()
+        .border_b_2()
+        .border_color(if is_active { palette.accent } else { gpui::transparent_black() })
         .cursor_pointer()
-        .text_size(rems(0.82))
+        .text_size(rems(0.84))
         .font_weight(if is_active { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
         .text_color(if is_active { palette.text } else { palette.muted })
-        .when(is_active, |el| el.bg(palette.raised))
-        .when(!is_active, |el| el.hover(|el| el.bg(palette.hover)))
+        .when(!is_active, |el| el.hover(|el| el.text_color(palette.text)))
         .child(label.into())
         .when_some(count.filter(|n| *n > 0), |el, n| el.child(count_badge(n, cx)))
+}
+
+pub fn section_tab_strip(id: &'static str, tabs: impl IntoIterator<Item = impl IntoElement>, cx: &App) -> impl IntoElement {
+    h_flex()
+        .id(id)
+        .flex_none()
+        .h(rems(2.6))
+        .px(dp(16.))
+        .gap(dp(18.))
+        .border_b_1()
+        .border_color(appearance::palette(cx).border_soft)
+        .overflow_x_scroll()
+        .children(tabs)
+}
+
+pub fn kbd(key: impl Into<SharedString>, cx: &App) -> impl IntoElement {
+    let palette = appearance::palette(cx);
+    div()
+        .flex_none()
+        .px(rems(0.35))
+        .rounded(dp(5.))
+        .border_1()
+        .border_color(palette.border)
+        .border_b_2()
+        .bg(palette.raised)
+        .font_family(MONO_FONT)
+        .text_size(rems(0.68))
+        .text_color(palette.muted)
+        .child(key.into())
+}
+
+pub fn keys(combination: &str, cx: &App) -> impl IntoElement {
+    h_flex().gap(dp(3.)).children(combination.split(' ').map(|key| kbd(key.to_string(), cx)))
+}
+
+pub fn icon_tile(icon: impl Into<gpui_component::Icon>, size: f32, cx: &App) -> impl IntoElement {
+    let palette = appearance::palette(cx);
+    div()
+        .flex_none()
+        .size(dp(size))
+        .rounded(dp(size * 0.3))
+        .flex()
+        .items_center()
+        .justify_center()
+        .border_1()
+        .border_color(palette.border_soft)
+        .bg(palette.raised)
+        .shadow(appearance::elevation::lifted(cx))
+        .text_color(palette.muted)
+        .child(icon.into().size(dp(size * 0.45)))
 }
 
 pub fn chip(text: impl Into<SharedString>, color: Hsla, cx: &App) -> Div {
@@ -103,20 +149,22 @@ pub fn segmented<T: Clone + PartialEq + 'static>(
     cx: &App,
 ) -> impl IntoElement {
     let palette = appearance::palette(cx);
-    h_flex().flex_none().flex_wrap().p(dp(3.)).gap(dp(2.)).rounded(dp(9.)).bg(palette.raised).children(options.into_iter().enumerate().map(
+    let selected_background = if cx.theme().is_dark() { palette.raised } else { palette.background };
+    let shadow = appearance::elevation::lifted(cx);
+    h_flex().flex_wrap().p(dp(3.)).gap(dp(2.)).rounded(dp(10.)).bg(palette.surface).children(options.into_iter().enumerate().map(
         |(index, (value, label))| {
             let is_selected = &value == selected;
             let on_pick = on_pick.clone();
             div()
                 .id(ElementId::NamedInteger(SharedString::from(id.to_string()), index as u64))
                 .px(rems(0.7))
-                .py(rems(0.28))
+                .py(rems(0.26))
                 .rounded(dp(7.))
                 .cursor_pointer()
                 .text_size(rems(0.8))
                 .font_weight(if is_selected { FontWeight::SEMIBOLD } else { FontWeight::MEDIUM })
-                .when(is_selected, |el| el.bg(palette.accent).text_color(palette.accent_text))
-                .when(!is_selected, |el| el.text_color(palette.muted).hover(|el| el.bg(palette.hover)))
+                .when(is_selected, |el| el.bg(selected_background).text_color(palette.text).shadow(shadow.clone()))
+                .when(!is_selected, |el| el.text_color(palette.muted).hover(|el| el.text_color(palette.text)))
                 .child(label)
                 .on_click(move |_, window, cx| on_pick(value.clone(), window, cx))
         },
@@ -127,7 +175,7 @@ pub fn code_box(content: impl IntoElement, cx: &App) -> Div {
     let palette = appearance::palette(cx);
     div()
         .size_full()
-        .rounded(dp(10.))
+        .rounded(dp(12.))
         .overflow_hidden()
         .border_1()
         .border_color(palette.border_soft)

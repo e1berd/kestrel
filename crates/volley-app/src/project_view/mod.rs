@@ -1,3 +1,4 @@
+mod empty_state;
 mod openapi_sync;
 mod sidebar;
 mod tab_strip;
@@ -18,7 +19,7 @@ use crate::appearance::{self, dp};
 use crate::dialogs::confirm;
 use crate::project::{Project, ProjectEvent};
 use crate::request_tab::{RequestTab, TabEvent};
-use crate::ui::{ReportUnlessGone as _, hint};
+use crate::ui::ReportUnlessGone as _;
 
 pub enum ProjectViewEvent {
     Changed,
@@ -166,19 +167,12 @@ impl ProjectView {
         let palette = appearance::palette(cx);
         let editor: AnyElement = match self.active_tab() {
             Some(tab) => tab.clone().into_any_element(),
-            None => v_flex()
-                .size_full()
-                .items_center()
-                .justify_center()
-                .gap_2()
-                .text_color(palette.muted)
-                .child("Pick a request on the left, or press Ctrl K")
-                .child(hint("Ctrl Enter sends · Ctrl S saves · Ctrl W closes · Ctrl N new request · Ctrl , settings", cx))
-                .into_any_element(),
+            None => empty_state::render_empty_editor(cx).into_any_element(),
         };
         div()
             .size_full()
-            .pl(dp(6.))
+            .pl(dp(4.))
+            .pb(dp(2.))
             .child(
                 v_flex()
                     .size_full()
@@ -187,6 +181,7 @@ impl ProjectView {
                     .bg(palette.background)
                     .border_1()
                     .border_color(palette.border_soft)
+                    .shadow(appearance::elevation::card(cx))
                     .when(!self.tabs.is_empty(), |el| el.child(self.render_tab_strip(cx)))
                     .child(div().flex_1().min_h_0().child(editor)),
             )

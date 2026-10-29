@@ -38,8 +38,8 @@ impl ProjectView {
         let load_error = project.load_error.clone();
         v_flex()
             .size_full()
-            .pt(dp(6.))
-            .px(dp(4.))
+            .pt(dp(8.))
+            .px(dp(6.))
             .gap(dp(10.))
             .child(self.render_sidebar_header(cx))
             .when_some(load_error, |el, error| el.child(div().mx_2().text_xs().text_color(palette.danger).child(error)))
@@ -80,7 +80,7 @@ impl ProjectView {
             .px(dp(6.))
             .gap(dp(2.))
             .items_center()
-            .child(eyebrow("Collection", cx))
+            .child(eyebrow("Requests", cx))
             .child(div().flex_1())
             .child(
                 icon_button("add-request", IconName::Plus).on_click(cx.listener(|view, _, window, cx| view.new_request(None, window, cx))),
@@ -131,12 +131,17 @@ impl ProjectView {
         let is_active = active == Some(row.path.as_path());
         let is_folder = row.method.is_none();
         let path = row.path.clone();
-        let indent = row.depth as f32 * 14. + if is_folder { 8. } else { 26. };
+        let indent = row.depth as f32 * 14. + if is_folder { 8. } else { 30. };
         let lead: AnyElement = match &row.method {
-            None => Icon::new(gpui_component::IconName::ChevronRight)
-                .size(dp(13.))
+            None => h_flex()
+                .gap(dp(6.))
                 .text_color(palette.faint)
-                .when(row.is_open, |icon| icon.rotate(gpui::Radians(std::f32::consts::FRAC_PI_2)))
+                .child(
+                    Icon::new(gpui_component::IconName::ChevronRight)
+                        .size(dp(12.))
+                        .when(row.is_open, |icon| icon.rotate(gpui::Radians(std::f32::consts::FRAC_PI_2))),
+                )
+                .child(Icon::new(if row.is_open { IconName::FolderOpen } else { IconName::Folder }).size(dp(14.)))
                 .into_any_element(),
             Some(method) => method_badge(method, cx).into_any_element(),
         };
@@ -145,18 +150,17 @@ impl ProjectView {
         h_flex()
             .id(ElementId::Name(SharedString::from(format!("row-{}", row.path.display()))))
             .w_full()
-            .h(rems(2.05))
+            .h(rems(2.0))
             .pl(dp(indent))
             .pr(dp(8.))
             .gap(dp(8.))
             .items_center()
             .rounded(dp(8.))
-            .border_1()
             .cursor_pointer()
-            .text_size(rems(0.87))
+            .text_size(rems(0.86))
             .text_color(if is_folder || is_active { palette.text } else { palette.muted })
-            .when(is_active, |el| el.bg(active_background).border_color(gpui::Hsla { a: 0.35, ..palette.accent }))
-            .when(!is_active, |el| el.border_color(gpui::transparent_black()).hover(|el| el.bg(palette.hover).text_color(palette.text)))
+            .when(is_active, |el| el.bg(active_background).font_weight(gpui::FontWeight::MEDIUM))
+            .when(!is_active, |el| el.hover(|el| el.bg(palette.hover).text_color(palette.text)))
             .child(lead)
             .child(div().flex_1().min_w_0().truncate().when(is_folder, |el| el.font_weight(gpui::FontWeight::MEDIUM)).child(row.name))
             .when(is_folder && row.count > 0, |el| {

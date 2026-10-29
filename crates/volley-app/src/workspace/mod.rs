@@ -6,6 +6,7 @@ mod title_bar;
 
 pub use title_bar::shortcut;
 mod welcome;
+mod welcome_screen;
 
 use std::path::{Path, PathBuf};
 
