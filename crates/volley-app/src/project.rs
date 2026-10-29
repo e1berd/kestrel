@@ -43,11 +43,15 @@ impl EventEmitter<ProjectEvent> for Project {}
 impl Project {
     pub fn open(path: &Path, interact: GuiInteract, cx: &mut gpui::App) -> Result<Entity<Self>> {
         let collection = Collection::open(path)?;
+        Ok(Self::from_collection(collection, interact, cx))
+    }
+
+    pub fn from_collection(collection: Collection, interact: GuiInteract, cx: &mut gpui::App) -> Entity<Self> {
         let prefs = Prefs::load();
         let env = prefs.env_for(&collection.root).filter(|name| collection.environment(name).is_some());
         Prefs::update(|p| p.opened(&collection.root));
         let root = collection.root.clone();
-        Ok(cx.new(|cx| {
+        cx.new(|cx| {
             let mut project = Self {
                 collection,
                 env,
@@ -62,7 +66,7 @@ impl Project {
             project.watch(root, cx);
             project.refresh_git(cx);
             project
-        }))
+        })
     }
 
     pub fn root(&self) -> &Path {

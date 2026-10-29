@@ -11,6 +11,7 @@ pub mod report;
 mod request_builder;
 pub mod script;
 pub mod session;
+pub mod transfer;
 pub mod variable_home;
 pub mod vars;
 pub mod yaml;

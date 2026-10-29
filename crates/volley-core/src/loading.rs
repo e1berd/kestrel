@@ -14,11 +14,14 @@ pub fn find_root(start: &Path) -> Option<PathBuf> {
     let start = start.canonicalize().ok()?;
     start.ancestors().find(|dir| dir.join(COLLECTION_FILE).is_file()).map(Path::to_path_buf)
 }
-pub(crate) fn read_dir(dir: &Path, ignored: &HashSet<String>) -> Result<Vec<Item>> {
+pub(crate) fn read_dir_tracked(dir: &Path, ignored: &HashSet<String>, progress: Option<&crate::transfer::Progress>) -> Result<Vec<Item>> {
     let mut items = Vec::new();
-    let mut entries: Vec<_> = fs::read_dir(dir)?.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+    let mut entries: Vec<_> = fs::read_dir(dir)?.map(|entry| entry.map(|entry| entry.path())).collect::<std::io::Result<_>>()?;
     entries.sort();
     for path in entries {
+        if let Some(progress) = progress {
+            progress.check()?;
+        }
         let name = path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
         if name.starts_with('.') || ignored.contains(&name) {
             continue;
@@ -26,14 +29,21 @@ pub(crate) fn read_dir(dir: &Path, ignored: &HashSet<String>) -> Result<Vec<Item
         if path.is_dir() {
             let folder_file = path.join(FOLDER_FILE);
             let doc = if folder_file.is_file() {
-                Document::read(&folder_file, true)?
+                let doc = Document::read(&folder_file, true)?;
+                if let Some(progress) = progress {
+                    progress.advance(1)?;
+                }
+                doc
             } else {
                 Document::new(folder_file, FolderFile::default(), true)
             };
-            let children = read_dir(&path, ignored)?;
+            let children = read_dir_tracked(&path, ignored, progress)?;
             items.push(Item::Folder(Folder { dir: path, doc, children }));
         } else if is_request_file(&path) {
             let doc = Document::<RequestFile>::read(&path, true)?;
+            if let Some(progress) = progress {
+                progress.advance(1)?;
+            }
             if doc.data.info.kind.is_empty() || doc.data.info.kind == "http" || doc.data.http.is_some() {
                 items.push(Item::Request(Request { doc }));
             }

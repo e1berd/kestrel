@@ -89,7 +89,8 @@ fn commands() -> Vec<Entry> {
         command("Environments…", "", |workspace, window, cx| workspace.with_view(cx, |view, cx| view.open_environments(window, cx))),
         command("Open collection…", "Ctrl O", Workspace::prompt_open),
         command("New collection…", "", Workspace::prompt_new_collection),
-        command("Import OpenAPI…", "", Workspace::prompt_import),
+        command("Import collection…", "", Workspace::prompt_import),
+        command("Export collection…", "", Workspace::prompt_export),
         command("Settings", "Ctrl ,", |_, window, cx| crate::settings::open(window, cx)),
         command("Switch light and dark theme", "", |_, _, cx| {
             let next = if gpui_component::Theme::global(cx).is_dark() { ThemeChoice::Light } else { ThemeChoice::Dark };

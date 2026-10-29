@@ -41,9 +41,7 @@ pub(crate) fn examples(
                 header.insert("name".into(), "Content-Type".into());
                 header.insert("value".into(), media.as_str().into());
                 res.insert("headers".into(), Yaml::Sequence(vec![Yaml::Mapping(header)]));
-                let sample = entry
-                    .get("example")
-                    .cloned()
+                let sample = media_example(spec, entry)
                     .unwrap_or_else(|| skeleton(spec, entry.get("schema").unwrap_or(&Json::Null), 0, &mut HashSet::new()));
                 let mut body = serde_yaml_ng::Mapping::new();
                 body.insert("type".into(), if media.contains("json") { "json" } else { "text" }.into());
@@ -72,6 +70,14 @@ pub(crate) fn examples(
     }
     out
 }
+
+pub(crate) fn media_example(spec: &Json, entry: &Json) -> Option<Json> {
+    entry.get("example").cloned().or_else(|| {
+        let example = entry.get("examples")?.as_object()?.values().next()?;
+        resolve(spec, example).get("value").cloned()
+    })
+}
+
 pub(crate) fn resolve(spec: &Json, value: &Json) -> Json {
     let mut current = value.clone();
     for _ in 0..16 {

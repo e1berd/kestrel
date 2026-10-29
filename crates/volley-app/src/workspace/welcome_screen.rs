@@ -18,7 +18,7 @@ type WelcomeAction = fn(&mut Workspace, &mut Window, &mut Context<Workspace>);
 const ACTIONS: [(&str, &str, &str, IconName, WelcomeAction); 3] = [
     ("welcome-open", "Open collection", "A Bruno 3 or Kestrel folder", IconName::FolderOpen, Workspace::prompt_open),
     ("welcome-new", "New collection", "Start empty in any folder", IconName::Plus, Workspace::prompt_new_collection),
-    ("welcome-import", "Import OpenAPI", "From a JSON or YAML spec", IconName::FileText, Workspace::prompt_import),
+    ("welcome-import", "Import collection", "OpenAPI, Swagger or Apidog", IconName::FileText, Workspace::prompt_import),
 ];
 
 impl Workspace {

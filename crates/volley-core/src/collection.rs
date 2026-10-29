@@ -8,7 +8,7 @@ use indexmap::IndexMap;
 pub use crate::document::Document;
 use crate::format::{CollectionFile, Defaults, EnvironmentFile, FolderFile, Info, RequestFile};
 pub use crate::loading::{file_stem, find_root, sanitize_file_name};
-use crate::loading::{read_dir, read_dotenv, read_environments, unique_path};
+use crate::loading::{read_dotenv, read_environments, unique_path};
 
 pub const COLLECTION_FILE: &str = "opencollection.yml";
 pub const FOLDER_FILE: &str = "folder.yml";
@@ -93,12 +93,23 @@ pub struct Collection {
 }
 impl Collection {
     pub fn open(root: &Path) -> Result<Self> {
+        Self::open_tracked(root, None)
+    }
+
+    pub fn open_with_progress(root: &Path, progress: &crate::transfer::Progress) -> Result<Self> {
+        Self::open_tracked(root, Some(progress))
+    }
+
+    fn open_tracked(root: &Path, progress: Option<&crate::transfer::Progress>) -> Result<Self> {
         let root =
             find_root(root).with_context(|| format!("{} is not a collection: there is no {COLLECTION_FILE} in it", root.display()))?;
         let doc = Document::<CollectionFile>::read(&root.join(COLLECTION_FILE), true)?;
+        if let Some(progress) = progress {
+            progress.advance(1)?;
+        }
         let mut ignored: HashSet<String> = doc.data.ignored().into_iter().collect();
         ignored.extend(["node_modules", ".git", ENVIRONMENTS_DIR].map(String::from));
-        let items = read_dir(&root, &ignored)?;
+        let items = crate::loading::read_dir_tracked(&root, &ignored, progress)?;
         let environments = read_environments(&root.join(ENVIRONMENTS_DIR))?;
         let dotenv = read_dotenv(&root.join(".env"));
         Ok(Self { root, doc, items, environments, dotenv })

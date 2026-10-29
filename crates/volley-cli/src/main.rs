@@ -10,8 +10,11 @@ use volley_core::oauth2::{Interact, browser_and_loopback};
 use volley_core::{Collection, Item, Plan, Session};
 use volley_openapi::{GroupBy, SyncOptions};
 
+mod importing;
+mod transfer;
+
 #[derive(Parser)]
-#[command(name = "kestrel-cli", version, about = "Kestrel from the terminal: run requests, import and sync OpenAPI")]
+#[command(name = "kestrel-cli", version, about = "Kestrel from the terminal: run requests, import, export and sync collections")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -19,6 +22,18 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    Export {
+        #[arg(default_value = ".")]
+        collection: PathBuf,
+        #[arg(short, long)]
+        out: PathBuf,
+        #[arg(long, default_value = "openapi32", value_parser = ["openapi30", "openapi31", "openapi32", "swagger20", "apidog"])]
+        format: String,
+        #[arg(long, default_value = "json", value_parser = ["json", "yaml"])]
+        encoding: String,
+        #[arg(long)]
+        overwrite: bool,
+    },
     Run {
         #[arg(default_value = ".")]
         path: PathBuf,
@@ -41,6 +56,8 @@ enum Command {
         name: Option<String>,
         #[arg(long, default_value = "tags")]
         group_by: String,
+        #[arg(long, default_value = "auto", value_parser = ["auto", "openapi", "apidog"])]
+        format: String,
     },
     Sync {
         #[arg(default_value = ".")]
@@ -67,8 +84,13 @@ fn parse_pair(text: &str) -> Result<(String, String), String> {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
+        Command::Export { collection, out, format, encoding, overwrite } => {
+            importing::export(&collection, &out, &format, &encoding, overwrite).map(|_| true)
+        }
         Command::Run { path, env, vars, bail, verbose, json } => run(&path, env.as_deref(), vars, bail, verbose, json),
-        Command::Import { spec, out, name, group_by } => import(&spec, &out, name.as_deref(), &group_by).map(|_| true),
+        Command::Import { spec, out, name, group_by, format } => {
+            importing::import(&spec, &out, name.as_deref(), &group_by, &format).map(|_| true)
+        }
         Command::Sync { collection, spec, group_by, prune, dry_run } => sync(&collection, spec, group_by, prune, dry_run).map(|_| true),
         Command::Envs { collection } => envs(&collection).map(|_| true),
     };
@@ -76,7 +98,7 @@ fn main() -> ExitCode {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::from(1),
         Err(e) => {
-            eprintln!("{} {e:#}", paint("error:", RED));
+            volley_core::report::report_error("run the CLI command", e);
             ExitCode::from(2)
         }
     }
@@ -275,21 +297,6 @@ fn size(bytes: usize) -> String {
     }
 }
 
-fn import(spec_source: &str, out: &Path, name: Option<&str>, group_by: &str) -> Result<()> {
-    let base = std::env::current_dir()?;
-    let spec = volley_openapi::load(spec_source, &base)?;
-    let remembered = if spec_source.contains("://") {
-        spec_source.to_string()
-    } else {
-        let absolute = base.join(spec_source).canonicalize()?;
-        std::fs::create_dir_all(out)?;
-        relative(&absolute, &out.canonicalize()?).unwrap_or_else(|| absolute.display().to_string())
-    };
-    let (collection, report) = volley_openapi::import(out, &remembered, &spec, GroupBy::parse(group_by), name)?;
-    println!("{} {} in {}: {report}", paint("Imported", GREEN), collection.name(), collection.root.display());
-    Ok(())
-}
-
 fn sync(path: &Path, spec: Option<String>, group_by: Option<String>, prune: bool, dry_run: bool) -> Result<()> {
     let mut collection = Collection::open(path)?;
     let sources = collection.doc.data.openapi_sources();
@@ -331,21 +338,4 @@ fn envs(path: &Path) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn relative(path: &Path, base: &Path) -> Option<String> {
-    let path: Vec<_> = path.components().collect();
-    let base: Vec<_> = base.components().collect();
-    let common = path.iter().zip(&base).take_while(|(a, b)| a == b).count();
-    if common == 0 {
-        return None;
-    }
-    let mut out = PathBuf::new();
-    for _ in common..base.len() {
-        out.push("..");
-    }
-    for part in &path[common..] {
-        out.push(part);
-    }
-    Some(out.display().to_string())
 }

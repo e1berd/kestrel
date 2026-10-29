@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-cli", "crates/volley-app"]
+members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-import", "crates/volley-cli", "crates/volley-app"]
 default-members = ["crates/volley-app"]
 
 [workspace.package]
@@ -13,6 +13,7 @@ rust-version = "1.88"
 [workspace.dependencies]
 volley-core = { path = "crates/volley-core" }
 volley-openapi = { path = "crates/volley-openapi" }
+volley-import = { path = "crates/volley-import" }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }
@@ -32,6 +33,7 @@ dotenvy = "0.15"
 clap = { version = "4", features = ["derive"] }
 dirs = "6"
 notify = "8"
+yaml-rust2 = { version = "0.13.0", default-features = false }
 
 [profile.dev]
 # GPUI is slow unoptimised; our own code stays quick to build.

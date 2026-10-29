@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context as _, Result, bail};
 use indexmap::IndexMap;
@@ -6,13 +6,15 @@ use serde_json::Value as Json;
 use volley_core::format::RequestFile;
 
 mod generate;
+mod loading;
 mod samples;
+mod swagger;
 mod sync;
 
 pub use generate::{generate, request_key};
 pub use sync::{Report, SyncOptions, import, sync};
 
-pub(crate) const METHODS: [&str; 8] = ["get", "post", "put", "patch", "delete", "head", "options", "trace"];
+pub(crate) const METHODS: [&str; 9] = ["get", "post", "put", "patch", "delete", "head", "options", "trace", "query"];
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GroupBy {
     Tags,
@@ -31,31 +33,45 @@ impl GroupBy {
     }
 }
 pub fn load(source: &str, base: &Path) -> Result<Json> {
-    let text = if source.starts_with("http://") || source.starts_with("https://") {
-        let response = reqwest::blocking::get(source).with_context(|| format!("download {source}"))?;
-        if !response.status().is_success() {
-            bail!("{source} answered {}", response.status());
-        }
-        response.text()?
-    } else {
-        let path = if Path::new(source).is_absolute() { PathBuf::from(source) } else { base.join(source) };
-        std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?
-    };
-    parse(&text)
+    normalize(loading::load(source, base)?)
 }
 pub fn parse(text: &str) -> Result<Json> {
+    let text = text.trim_start_matches('\u{feff}');
     let spec: Json = match serde_json::from_str(text) {
         Ok(json) => json,
         Err(_) => serde_yaml_ng::from_str(text).context("the spec is neither JSON nor YAML")?,
     };
+    normalize(spec)
+}
+
+pub fn normalize(spec: Json) -> Result<Json> {
     match spec.get("openapi").and_then(Json::as_str) {
-        Some(v) if v.starts_with('3') => Ok(spec),
-        Some(v) => bail!("OpenAPI {v} is not supported; 3.0 and 3.1 are"),
-        None if spec.get("swagger").is_some() => {
-            bail!("Swagger 2.0 is not supported yet; convert it to OpenAPI 3 first")
+        Some(version) if supported_version(version) => {
+            if !spec.get("info").is_some_and(Json::is_object) {
+                bail!("the OpenAPI spec must contain an `info` object");
+            }
+            if let Some(paths) = spec.get("paths")
+                && !paths.is_object()
+            {
+                bail!("OpenAPI `paths` must be an object");
+            }
+            for (path, item) in spec.get("paths").and_then(Json::as_object).into_iter().flatten() {
+                if path.starts_with('/') && !item.is_object() {
+                    bail!("OpenAPI path item `{path}` must be an object");
+                }
+            }
+            Ok(spec)
         }
+        Some(version) => bail!("OpenAPI {version} is not supported; use 3.0, 3.1, 3.2 or Swagger 2.0"),
+        None if spec.get("swagger").and_then(Json::as_str) == Some("2.0") => swagger::convert(spec),
+        None if spec.get("swagger").is_some() => bail!("only Swagger 2.0 is supported"),
         None => bail!("that is not an OpenAPI spec (it has no `openapi` field)"),
     }
+}
+
+fn supported_version(version: &str) -> bool {
+    let parts: Vec<_> = version.split('.').collect();
+    parts.len() == 3 && parts[0] == "3" && matches!(parts[1], "0" | "1" | "2") && parts[2].parse::<u32>().is_ok()
 }
 #[derive(Debug, Clone)]
 pub struct Operation {

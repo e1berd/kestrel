@@ -100,7 +100,8 @@ impl Workspace {
                 };
                 menu.item(item("Open collection…", Workspace::prompt_open))
                     .item(item("New collection…", Workspace::prompt_new_collection))
-                    .item(item("Import OpenAPI…", Workspace::prompt_import))
+                    .item(item("Import collection…", Workspace::prompt_import))
+                    .item(item("Export collection…", Workspace::prompt_export))
             },
         )
     }

@@ -228,6 +228,7 @@ fn collection_menu(menu: PopupMenu, view: gpui::WeakEntity<ProjectView>) -> Popu
     menu.item(item("New folder", |view, window, cx| view.new_folder(None, window, cx)))
         .item(item("Environments…", |view, window, cx| view.open_environments(window, cx)))
         .item(item("Sync from OpenAPI", |view, window, cx| view.sync_openapi(window, cx)))
+        .item(item("Export collection…", |view, window, cx| crate::export_dialog::open(view.root(cx), window, cx)))
         .separator()
         .item(item("Reload from disk", |view, _, cx| view.project.update(cx, |project, cx| project.reload(cx))))
         .item(item("Show in file manager", |view, _, cx| reveal_collection(view, cx)))

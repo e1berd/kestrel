@@ -12,10 +12,12 @@ Code name: **volley**.
 - **Requests**: params (path and query), headers, JSON / text / XML / form / multipart / GraphQL bodies, auth inherited from folders and the collection: bearer, basic, API key, OAuth 2.0 (authorization code with PKCE, client credentials, password).
 - **Variables**: `{{name}}` from the collection, environments, folders, requests and scripts; `{{process.env.NAME}}` from `.env`; `{{$randomUUID}}`, `{{$timestamp}}` and friends.
 - **Scripts and tests**: before-request and after-response scripts and `test()` / `expect()` with Bruno's API (`bru`, `req`, `res`) in QuickJS, `require('jsonwebtoken')` included.
-- **OpenAPI 3**: import a spec into a new collection, then sync it as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
+- **Imports**: OpenAPI 3.0 / 3.1 / 3.2 and Swagger 2.0 in JSON or YAML, and native Apidog JSON exports. Preview requests, folders and conversion warnings before choosing an empty destination folder.
+- **Exports**: OpenAPI 3.0 / 3.1 / 3.2, Swagger 2.0 and Apidog, with streaming file handling and actual stage progress in both transfer dialogs.
+- **OpenAPI sync**: sync an imported collection as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
 - **Several projects open at once**, each with its own tabs; switch from the rail on the left or with Ctrl+Shift+[ / ].
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
-- **CLI** for terminals and CI: `kestrel-cli run`, `import`, `sync`.
+- **CLI** for terminals and CI: `kestrel-cli run`, `import`, `export`, `sync`.
 
 ## Build
 
@@ -42,6 +44,25 @@ kestrel-cli run path/to/collection --env local
 ```bash
 kestrel-cli import openapi.json --out my-api
 ```
+
+```bash
+kestrel-cli import project.apidog.json --out my-api --format apidog
+```
+
+Import formats are detected automatically; `--format openapi` or `--format apidog` selects one explicitly. OpenAPI imports support `--group-by tags` (default) or `--group-by path`, and JSON Pointer `$ref` references to local files or HTTP(S) documents. The desktop **Import collection…** dialog offers the same formats and grouping options.
+
+Apidog imports preserve HTTP requests, nested folders, descriptions, parameters, request bodies and response schemas. Apidog environments, test scenarios and processors require manual migration; the preview lists skipped data. Authentication credentials become `{{process.env.API_TOKEN}}`, `{{process.env.API_KEY}}` or `{{process.env.API_USERNAME}}` / `{{process.env.API_PASSWORD}}` placeholders. Authorization headers use `{{process.env.AUTHORIZATION}}`. Add their values to the collection's git-ignored `.env` file.
+
+`cargo test -p volley-cli --test import_e2e` checks the importer against [38 pinned public OpenAPI/Swagger examples](crates/volley-import/tests/fixtures/upstream/README.md), native Apidog fixtures and a local HTTP server. It runs without internet access.
+
+Choose **Export collection…** from the collection menu or command palette, or run:
+
+```bash
+kestrel-cli export path/to/collection --out openapi.yaml --format openapi32 --encoding yaml
+kestrel-cli export path/to/collection --out project.apidog.json --format apidog
+```
+
+Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apidog`. Use `--overwrite` to replace an existing export file. The desktop and terminal show actual progress for reading, conversion and writing. Transfers use temporary disk storage; the [transfer guide](crates/volley-import/README.md) documents memory behavior, cancellation, format limitations and reproducible large-file checks.
 
 ```bash
 kestrel-cli sync path/to/collection

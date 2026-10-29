@@ -10,6 +10,8 @@ mod appearance;
 mod assets;
 mod dialogs;
 mod env_editor;
+mod export_dialog;
+mod import_dialog;
 mod interact;
 mod kv_table;
 mod prefs;
@@ -17,6 +19,7 @@ mod project;
 mod project_view;
 mod request_tab;
 mod settings;
+mod transfer_progress;
 mod ui;
 mod workspace;
 

@@ -1,0 +1,65 @@
+{
+  "apidogProject": "1.0.0",
+  "info": {"name": "Pet store", "description": "An imported project"},
+  "apiCollection": [
+    {
+      "name": "Pets",
+      "description": "Pet endpoints",
+      "auth": {"type": "bearer", "bearer": {"token": "must-not-be-written"}},
+      "items": [
+        {
+          "name": "Details",
+          "items": [
+            {
+              "name": "Get pet",
+              "api": {
+                "method": "get",
+                "path": "/pets/{id}",
+                "description": "Find a pet by ID",
+                "parameters": {
+                  "path": [{"name": "id", "type": "integer", "value": "42", "required": true}],
+                  "query": [{"name": "full", "type": "boolean", "value": "true", "enable": false}],
+                  "header": [{"name": "X-Client", "value": "Kestrel", "enable": true}]
+                },
+                "responses": [{"code": 200, "name": "A pet", "jsonSchema": {"$ref": "#/definitions/17"}}]
+              }
+            },
+            {
+              "name": "Create pet",
+              "api": {
+                "method": "post",
+                "path": "/pets",
+                "auth": {"type": "noauth"},
+                "requestBody": {"type": "application/json", "jsonSchema": {"$ref": "#/definitions/17"}}
+              }
+            },
+            {
+              "name": "Create pet",
+              "api": {
+                "method": "post",
+                "path": "/pets",
+                "requestBody": {"type": "application/json", "data": "{\"name\":\"Rex\"}"},
+                "preProcessors": [{"type": "customScript", "data": "pm.variables.set('x', 1)"}]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload",
+          "api": {
+            "method": "post",
+            "path": "/upload",
+            "requestBody": {"type": "multipart/form-data", "parameters": [
+              {"name": "avatar", "type": "file", "value": "{{avatar}}", "enable": true},
+              {"name": "caption", "value": "A pet", "enable": false}
+            ]}
+          }
+        }
+      ]
+    }
+  ],
+  "schemaCollection": [{"name": "Models", "items": [
+    {"id": 17, "name": "Pet", "schema": {"jsonSchema": {"type": "object", "properties": {"name": {"type": "string", "example": "Milo"}}}}}
+  ]}],
+  "environments": [{"name": "Production", "variables": [{"name": "token", "value": "secret"}]}]
+}

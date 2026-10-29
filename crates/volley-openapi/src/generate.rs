@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::samples::{examples, json_text, resolve, skeleton};
+use crate::samples::{examples, json_text, media_example, resolve, skeleton};
 use crate::{Generated, GroupBy, METHODS, Operation};
 use indexmap::IndexMap;
 use serde_json::Value as Json;
@@ -9,7 +9,7 @@ use volley_core::format::{Auth, AuthConfig, Body, Docs, Http, Info, KeyValue, Re
 
 pub fn generate(spec: &Json, group_by: GroupBy) -> Generated {
     let title = spec.pointer("/info/title").and_then(Json::as_str).unwrap_or("API").to_string();
-    let base_url = spec.pointer("/servers/0/url").and_then(Json::as_str).map(str::to_string);
+    let base_url = spec.pointer("/servers/0").and_then(server_url);
     let mut folder_docs = IndexMap::new();
     for tag in spec.get("tags").and_then(Json::as_array).into_iter().flatten() {
         if let (Some(name), Some(description)) = (tag.get("name").and_then(Json::as_str), tag.get("description").and_then(Json::as_str)) {
@@ -23,9 +23,16 @@ pub fn generate(spec: &Json, group_by: GroupBy) -> Generated {
     let empty = serde_json::Map::new();
     for (path, item) in spec.get("paths").and_then(Json::as_object).unwrap_or(&empty) {
         let item = resolve(spec, item);
-        let shared_params: Vec<Json> = item.get("parameters").and_then(Json::as_array).cloned().unwrap_or_default();
-        for method in METHODS {
-            let Some(op) = item.get(method) else { continue };
+        let shared_params: Vec<Json> =
+            item.get("parameters").and_then(Json::as_array).into_iter().flatten().map(|parameter| resolve(spec, parameter)).collect();
+        let path_operations = METHODS.into_iter().filter_map(|method| item.get(method).map(|operation| (method, operation))).chain(
+            item.get("additionalOperations")
+                .and_then(Json::as_object)
+                .into_iter()
+                .flatten()
+                .map(|(method, operation)| (method.as_str(), operation)),
+        );
+        for (method, op) in path_operations {
             let tag = op.pointer("/tags/0").and_then(Json::as_str).map(str::to_string);
             let folder = match group_by {
                 GroupBy::Tags => tag.clone(),
@@ -43,11 +50,26 @@ pub fn generate(spec: &Json, group_by: GroupBy) -> Generated {
                 params.push(p.clone());
             }
             let security = op.get("security").cloned().or_else(|| global_security.clone());
-            let file = request_file(spec, path, method, op, &params, security.as_ref(), &schemes, *counter);
+            let mut file = request_file(spec, path, method, op, &params, security.as_ref(), &schemes, *counter);
+            if let Some(server) = op.pointer("/servers/0").or_else(|| item.pointer("/servers/0")).and_then(server_url)
+                && let Some(http) = &mut file.http
+            {
+                http.url = http.url.replacen("{{baseUrl}}", server.trim_end_matches('/'), 1);
+            }
             operations.push(Operation { folder, file, key: key(method, path) });
         }
     }
     Generated { title, base_url, operations, folder_docs }
+}
+
+fn server_url(server: &Json) -> Option<String> {
+    let mut url = server.get("url")?.as_str()?.to_string();
+    for (name, variable) in server.get("variables").and_then(Json::as_object).into_iter().flatten() {
+        if let Some(value) = variable.get("default") {
+            url = url.replace(&format!("{{{name}}}"), &json_text(value));
+        }
+    }
+    Some(url)
 }
 pub(crate) fn key(method: &str, path: &str) -> String {
     let normalized: Vec<&str> =
@@ -119,7 +141,7 @@ pub(crate) fn request_file(
                 let values: Vec<String> =
                     schema.get("enum").and_then(Json::as_array).map(|v| v.iter().map(json_text).collect()).unwrap_or_default();
                 if values.is_empty() {
-                    kv.disabled = !required && preset.is_none();
+                    kv.disabled = p.get("x-kestrel-disabled").and_then(Json::as_bool).unwrap_or(!required && preset.is_none());
                     kv_params.push(kv.with_kind("query"));
                 }
                 for (i, value) in values.iter().enumerate() {
@@ -128,7 +150,10 @@ pub(crate) fn request_file(
                     kv_params.push(option);
                 }
             }
-            Some("header") => headers.push(kv),
+            Some("header") => {
+                kv.disabled = p.get("x-kestrel-disabled").and_then(Json::as_bool).unwrap_or(false);
+                headers.push(kv);
+            }
             _ => {}
         }
     }
@@ -161,22 +186,40 @@ pub(crate) fn request_body(spec: &Json, body: &Json) -> Option<Body> {
     let content = body.get("content")?.as_object()?;
     let (media, entry) = content.iter().find(|(m, _)| m.contains("json")).or_else(|| content.iter().next())?;
     let schema = entry.get("schema").cloned().unwrap_or(Json::Null);
-    let example = entry
-        .get("example")
-        .cloned()
-        .or_else(|| entry.pointer("/examples").and_then(|e| e.as_object()?.values().next()?.get("value").cloned()));
+    let example = media_example(spec, entry);
     let sample = example.unwrap_or_else(|| skeleton(spec, &schema, 0, &mut HashSet::new()));
     Some(if media.contains("json") {
         Body::text("json", serde_json::to_string_pretty(&sample).unwrap_or_default())
     } else if media == "application/x-www-form-urlencoded" || media == "multipart/form-data" {
         let kind = if media.starts_with("multipart") { "multipart-form" } else { "form-urlencoded" };
         let mut body = Body { kind: kind.into(), ..Default::default() };
-        let fields: Vec<KeyValue> =
-            sample.as_object().map(|o| o.iter().map(|(k, v)| KeyValue::new(k, json_text(v))).collect()).unwrap_or_default();
+        let schema = resolve(spec, &schema);
+        let fields: Vec<KeyValue> = sample
+            .as_object()
+            .map(|object| {
+                object
+                    .iter()
+                    .map(|(name, value)| {
+                        let mut field = KeyValue::new(name, json_text(value));
+                        let property = schema
+                            .get("properties")
+                            .and_then(|properties| properties.get(name))
+                            .map(|property| resolve(spec, property))
+                            .unwrap_or(Json::Null);
+                        if property["format"] == "binary" || property["type"] == "file" {
+                            field.kind = Some("file".into());
+                        }
+                        field.disabled = property.get("x-kestrel-disabled").and_then(Json::as_bool).unwrap_or(false);
+                        field.description = property.get("description").and_then(Json::as_str).map(str::to_string);
+                        field
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         body.set_fields(&fields);
         body
     } else if media.contains("xml") {
-        Body::text("xml", "")
+        Body::text("xml", json_text(&sample))
     } else {
         Body::text("text", json_text(&sample))
     })
@@ -202,6 +245,13 @@ pub(crate) fn security_auth(security: Option<&Json>, schemes: &Json) -> Auth {
                     let mut config = AuthConfig::new("basic");
                     config.set("username", "{{username}}");
                     config.set("password", "{{password}}");
+                    return Auth::Config(config);
+                }
+                (Some("apiKey"), _) => {
+                    let mut config = AuthConfig::new("apikey");
+                    config.set("key", scheme.get("name").and_then(Json::as_str).unwrap_or("X-API-Key"));
+                    config.set("value", "{{process.env.API_KEY}}");
+                    config.set("placement", scheme.get("in").and_then(Json::as_str).unwrap_or("header"));
                     return Auth::Config(config);
                 }
                 _ => {}

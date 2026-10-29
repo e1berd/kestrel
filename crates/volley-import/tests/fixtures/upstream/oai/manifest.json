@@ -1,0 +1,427 @@
+{
+  "repository": "https://github.com/OAI/learn.openapis.org",
+  "revision": "82b82f372aa185a07ea11bc158619895ab21f741",
+  "license": "CC-BY-4.0",
+  "files": [
+    {
+      "path": "v2.0/json/api-with-examples.json",
+      "sha256": "f87608c152fac7180607d6459a6987cba6b000402627986e7c2fb92f94cff14b"
+    },
+    {
+      "path": "v2.0/json/petstore-expanded.json",
+      "sha256": "5c44b147cc401deb074b0cd9f5cc3b638b07fcd5b17a76206d977eb898e7d375"
+    },
+    {
+      "path": "v2.0/json/petstore-minimal.json",
+      "sha256": "d62d85d467ca86dc9f5ebeb6c9eda996822c972ecf00d6862beb0f25f01bcddd"
+    },
+    {
+      "path": "v2.0/json/petstore-separate/common/Error.json",
+      "sha256": "cab77db04dd9a2186c923d883fef418526c9e095f83a218780fbaf262bdc375c"
+    },
+    {
+      "path": "v2.0/json/petstore-separate/spec/NewPet.json",
+      "sha256": "5b7774bd64a8d9eaec54bdf5d4338a825ab32efd83bae6ed6e01111471968085"
+    },
+    {
+      "path": "v2.0/json/petstore-separate/spec/Pet.json",
+      "sha256": "d051f898ad0805479c54b197d9e5bfbfd1d46c5198770b8df6a85f6429e214ba"
+    },
+    {
+      "path": "v2.0/json/petstore-separate/spec/parameters.json",
+      "sha256": "48ff5768f4c27760da002ec692ac93102a1467a0346e8f8a4d39983569dd41d7"
+    },
+    {
+      "path": "v2.0/json/petstore-separate/spec/swagger.json",
+      "sha256": "2574f45be8e1cdfbd6545994ebb9eca138b59b01019c696d7b8ea27c94a7edb3"
+    },
+    {
+      "path": "v2.0/json/petstore-simple.json",
+      "sha256": "feacc90e9a4daacfbdf87cdde121c5849f5d772ae73a4966b06e397933eab74a"
+    },
+    {
+      "path": "v2.0/json/petstore-with-external-docs.json",
+      "sha256": "5b34c38cd1052a8614ea73740fd1e2d52f9ffbe111041348bdeec938a186061c"
+    },
+    {
+      "path": "v2.0/json/petstore.json",
+      "sha256": "66f2cad010efb1ef12bd006fa082862134a5f523baadeb14781e22464e33ff19"
+    },
+    {
+      "path": "v2.0/json/uber.json",
+      "sha256": "4372f3f6fa7d56f5baade386429f4f9b5e8950ddaf30574b966461300f4480af"
+    },
+    {
+      "path": "v2.0/yaml/api-with-examples.yaml",
+      "sha256": "7a10daca44dba5c82e896e9455593ede653dbf6d56401d31544c9ffb904ccfb1"
+    },
+    {
+      "path": "v2.0/yaml/petstore-expanded.yaml",
+      "sha256": "0cc54991bbc2da80b068a437df2c78c7403684e6421028da4842a26a09d1f220"
+    },
+    {
+      "path": "v2.0/yaml/petstore-minimal.yaml",
+      "sha256": "e763737014747a2d6ac5828dde8b0946981faba404dce67e9a53e1b63096b0ec"
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/common/Error.yaml",
+      "sha256": "26b25c91e94f3661ec0c78cd912fd6a906c4670378b0f97e84125a8858f58d83"
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/spec/NewPet.yaml",
+      "sha256": "1df0ee3eb9abcdb6d143c0741c3aa4237d0226e886af49d45baea6598f2b736b"
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/spec/Pet.yaml",
+      "sha256": "f4615f4c74213a8f585e969e36a1653b1e917f65be05a8349de7e4addf05379f"
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/spec/parameters.yaml",
+      "sha256": "727b27132ddbb5c46af5c682de3df967c320ecb520b810fe9e7a79bcd901f80b"
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/spec/swagger.yaml",
+      "sha256": "f3583436faa0ccacf760a5b4ab8b344d8995e6cd707936d82dbac714ff3ab6e9"
+    },
+    {
+      "path": "v2.0/yaml/petstore-simple.yaml",
+      "sha256": "e6c0ebc7a1dda4cfcc1f883753f8cf558d6768e0fd68fcabaac222dc2892c3dc"
+    },
+    {
+      "path": "v2.0/yaml/petstore-with-external-docs.yaml",
+      "sha256": "cf80de6593113ca5e9bd4d9f870dd0d78d98b54bb94e5ee9849795181ba47ab8"
+    },
+    {
+      "path": "v2.0/yaml/petstore.yaml",
+      "sha256": "9fdb0fc3767861fcd86811901165a930c2c3102edbbcc20e4efb13064bfc44c7"
+    },
+    {
+      "path": "v2.0/yaml/uber.yaml",
+      "sha256": "d5e1168897e321109d89d1a6233e2c88cd6af7018618d0401069a33dd0f9880f"
+    },
+    {
+      "path": "v3.0/api-with-examples.json",
+      "sha256": "875dbb3fbc5ae9d512965fe9fdc6a0da3c47314061b8f9bbf082b1c94188234f"
+    },
+    {
+      "path": "v3.0/api-with-examples.yaml",
+      "sha256": "2b8d39097f8d0800b3d9b94f784348ea6d046a82c2b78e83b737874c938e63b9"
+    },
+    {
+      "path": "v3.0/callback-example.json",
+      "sha256": "b432cd93cb3d74fba68e08bed76d4c4d7675a67eefdf2e0220688613685ae11d"
+    },
+    {
+      "path": "v3.0/callback-example.yaml",
+      "sha256": "c9695b830c457df0b2f7e62f91b270be5628f239947926e279ccca895b950c0f"
+    },
+    {
+      "path": "v3.0/link-example.json",
+      "sha256": "8401cc3594901e51535778150caed2187b93ac26c5b5bc2c61e466ce8e23c234"
+    },
+    {
+      "path": "v3.0/link-example.yaml",
+      "sha256": "92b502f64d80d67e2a8e634e5b82e9b7ae1f1e8fb5b754cc1c2cad1102447206"
+    },
+    {
+      "path": "v3.0/petstore-expanded.json",
+      "sha256": "f6bfb72631c05ce8f586f3b20dc03980e54a0b97339547c1eb6ab0e08ea05b0f"
+    },
+    {
+      "path": "v3.0/petstore-expanded.yaml",
+      "sha256": "abc68d08c674c8f0415aaeeb87c4203d5dd7257cdb79ac7ccb0446d1c5b9a7c2"
+    },
+    {
+      "path": "v3.0/petstore.json",
+      "sha256": "d27ff28ca7d7795f5568e188a92b064750f7de8fea0d79b44488ff4c1a9f92ba"
+    },
+    {
+      "path": "v3.0/petstore.yaml",
+      "sha256": "cefaafa05eee75b1888762dea08a295f245e9f3e4bdb8777f4bdfed09e335339"
+    },
+    {
+      "path": "v3.0/uspto.json",
+      "sha256": "44c2357b569619b4dbd170583a04b6f88023aec14e391cd3f007deed4279b11c"
+    },
+    {
+      "path": "v3.0/uspto.yaml",
+      "sha256": "29d32d0a0710b0acac434807e018ebd9cc192ad604fefdcf51422833b5963642"
+    },
+    {
+      "path": "v3.1/non-oauth-scopes.json",
+      "sha256": "58efe1e659310292d81324fa944c6d097fa002ff8fd7e7c68d2dd0525a7bc4e2"
+    },
+    {
+      "path": "v3.1/non-oauth-scopes.yaml",
+      "sha256": "f51b1e1e8abda7bfc790f6e9fbddf36c24353576d3bf7cd2e33e0670e965b177"
+    },
+    {
+      "path": "v3.1/tictactoe.json",
+      "sha256": "300bfa77bdf401808e062ca98a2738d86a694edee693f7df1afa475a364c756a"
+    },
+    {
+      "path": "v3.1/tictactoe.yaml",
+      "sha256": "772a199c00079409660f84ef7746f3f5f6cb3250945732bedd3529ff913d85d3"
+    },
+    {
+      "path": "v3.1/webhook-example.json",
+      "sha256": "b6fe223c6ea41a272b7bc290633279252cda8bbcfbdd5b9991276f140f861341"
+    },
+    {
+      "path": "v3.1/webhook-example.yaml",
+      "sha256": "1bf9c928e1d42d5ffd3d793dbc6b569bd47a97a4679ee5c85cd78091136ab2a4"
+    },
+    {
+      "path": "v3.2/3.2-query-example.json",
+      "sha256": "3da485da4b5de55262ff0107d0fa1208da82b42fb391b049e757fcbe51f30f00"
+    },
+    {
+      "path": "v3.2/3.2-query-example.yaml",
+      "sha256": "b303415fb10b1db28d74a35ec584441eba269e62c916b90337841dc0e3525c42"
+    },
+    {
+      "path": "v3.2/3.2-tags-example.json",
+      "sha256": "c3ca2c93a18658455b05bb0454e1580ec3db3df11db218d18743090616f573c2"
+    },
+    {
+      "path": "v3.2/3.2-tags-example.yaml",
+      "sha256": "8dcbcce8641c5fa11243faf3266daa2fcea7a2a5c2d919bf20fab8e3551b45de"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "8ae9438818c26e4873b91d8c6ad620526c011e27e125677f13031eda903f007c"
+    }
+  ],
+  "cases": [
+    {
+      "path": "v2.0/json/api-with-examples.json",
+      "version": "2.0",
+      "title": "Simple API overview",
+      "requests": 2
+    },
+    {
+      "path": "v2.0/yaml/api-with-examples.yaml",
+      "version": "2.0",
+      "title": "Simple API overview",
+      "requests": 2
+    },
+    {
+      "path": "v2.0/json/petstore-expanded.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/yaml/petstore-expanded.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/json/petstore-minimal.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 1
+    },
+    {
+      "path": "v2.0/yaml/petstore-minimal.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 1
+    },
+    {
+      "path": "v2.0/json/petstore-separate/spec/swagger.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/yaml/petstore-separate/spec/swagger.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/json/petstore-simple.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/yaml/petstore-simple.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/json/petstore-with-external-docs.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/yaml/petstore-with-external-docs.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v2.0/json/petstore.json",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 3
+    },
+    {
+      "path": "v2.0/yaml/petstore.yaml",
+      "version": "2.0",
+      "title": "Swagger Petstore",
+      "requests": 3
+    },
+    {
+      "path": "v2.0/json/uber.json",
+      "version": "2.0",
+      "title": "Uber API",
+      "requests": 5
+    },
+    {
+      "path": "v2.0/yaml/uber.yaml",
+      "version": "2.0",
+      "title": "Uber API",
+      "requests": 5
+    },
+    {
+      "path": "v3.0/api-with-examples.json",
+      "version": "3.0.0",
+      "title": "Simple API overview",
+      "requests": 2
+    },
+    {
+      "path": "v3.0/api-with-examples.yaml",
+      "version": "3.0.0",
+      "title": "Simple API overview",
+      "requests": 2
+    },
+    {
+      "path": "v3.0/callback-example.json",
+      "version": "3.0.0",
+      "title": "Callback Example",
+      "requests": 1
+    },
+    {
+      "path": "v3.0/callback-example.yaml",
+      "version": "3.0.0",
+      "title": "Callback Example",
+      "requests": 1
+    },
+    {
+      "path": "v3.0/link-example.json",
+      "version": "3.0.0",
+      "title": "Link Example",
+      "requests": 6
+    },
+    {
+      "path": "v3.0/link-example.yaml",
+      "version": "3.0.0",
+      "title": "Link Example",
+      "requests": 6
+    },
+    {
+      "path": "v3.0/petstore-expanded.json",
+      "version": "3.0.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v3.0/petstore-expanded.yaml",
+      "version": "3.0.0",
+      "title": "Swagger Petstore",
+      "requests": 4
+    },
+    {
+      "path": "v3.0/petstore.json",
+      "version": "3.0.0",
+      "title": "Swagger Petstore",
+      "requests": 3
+    },
+    {
+      "path": "v3.0/petstore.yaml",
+      "version": "3.0.0",
+      "title": "Swagger Petstore",
+      "requests": 3
+    },
+    {
+      "path": "v3.0/uspto.json",
+      "version": "3.0.1",
+      "title": "USPTO Data Set API",
+      "requests": 3
+    },
+    {
+      "path": "v3.0/uspto.yaml",
+      "version": "3.0.1",
+      "title": "USPTO Data Set API",
+      "requests": 3
+    },
+    {
+      "path": "v3.1/non-oauth-scopes.json",
+      "version": "3.1.0",
+      "title": "Non-oAuth Scopes example",
+      "requests": 1
+    },
+    {
+      "path": "v3.1/non-oauth-scopes.yaml",
+      "version": "3.1.0",
+      "title": "Non-oAuth Scopes example",
+      "requests": 1
+    },
+    {
+      "path": "v3.1/tictactoe.json",
+      "version": "3.1.0",
+      "title": "Tic Tac Toe",
+      "requests": 3
+    },
+    {
+      "path": "v3.1/tictactoe.yaml",
+      "version": "3.1.0",
+      "title": "Tic Tac Toe",
+      "requests": 3
+    },
+    {
+      "path": "v3.1/webhook-example.json",
+      "version": "3.1.0",
+      "title": "Webhook Example",
+      "requests": 0,
+      "error": "no HTTP operations"
+    },
+    {
+      "path": "v3.1/webhook-example.yaml",
+      "version": "3.1.0",
+      "title": "Webhook Example",
+      "requests": 0,
+      "error": "no HTTP operations"
+    },
+    {
+      "path": "v3.2/3.2-query-example.json",
+      "version": "3.2.0",
+      "title": "Flight API",
+      "requests": 1
+    },
+    {
+      "path": "v3.2/3.2-query-example.yaml",
+      "version": "3.2.0",
+      "title": "Flight API",
+      "requests": 1
+    },
+    {
+      "path": "v3.2/3.2-tags-example.json",
+      "version": "3.2.0",
+      "title": "Flight API",
+      "requests": 4
+    },
+    {
+      "path": "v3.2/3.2-tags-example.yaml",
+      "version": "3.2.0",
+      "title": "Flight API",
+      "requests": 4
+    }
+  ]
+}

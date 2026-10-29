@@ -112,6 +112,18 @@ impl Workspace {
         }
     }
 
+    pub fn open_loaded_collection(&mut self, collection: volley_core::Collection, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = self.views.iter().position(|view| view.read(cx).root(cx) == collection.root) {
+            self.activate(index, window, cx);
+            return;
+        }
+        let project = Project::from_collection(collection, self.interact.clone(), cx);
+        let view = cx.new(|cx| ProjectView::new(project, window, cx));
+        self._subscriptions.push(cx.subscribe(&view, |_, _, _: &ProjectViewEvent, cx| cx.notify()));
+        self.views.push(view);
+        self.activate(self.views.len() - 1, window, cx);
+    }
+
     fn activate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(view) = self.views.get(index) else { return };
         self.active = index;
