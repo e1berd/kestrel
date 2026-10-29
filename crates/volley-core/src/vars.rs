@@ -3,6 +3,17 @@ use rand::Rng;
 
 pub type Vars = IndexMap<String, String>;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    ProcessEnv,
+    Dynamic,
+    Runtime,
+    Request,
+    Folder(usize),
+    Environment,
+    Collection,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Scope {
     pub collection: Vars,
@@ -28,6 +39,29 @@ impl Scope {
             .or_else(|| self.environment.get(name))
             .or_else(|| self.collection.get(name))
             .cloned()
+    }
+
+    pub fn origin(&self, name: &str) -> Option<Origin> {
+        if let Some(env_name) = name.strip_prefix("process.env.") {
+            let is_set = self.process_env.contains_key(env_name) || std::env::var_os(env_name).is_some();
+            return is_set.then_some(Origin::ProcessEnv);
+        }
+        if dynamic(name).is_some() {
+            return Some(Origin::Dynamic);
+        }
+        if self.runtime.contains_key(name) {
+            return Some(Origin::Runtime);
+        }
+        if self.request.contains_key(name) {
+            return Some(Origin::Request);
+        }
+        if let Some(index) = self.folders.iter().rposition(|folder| folder.contains_key(name)) {
+            return Some(Origin::Folder(index));
+        }
+        if self.environment.contains_key(name) {
+            return Some(Origin::Environment);
+        }
+        self.collection.contains_key(name).then_some(Origin::Collection)
     }
 
     pub fn all(&self) -> Vars {
@@ -135,6 +169,18 @@ mod tests {
         scope.runtime.insert("token".into(), "abc".into());
         assert_eq!(scope.interpolate("{{baseUrl}}/me?t={{ token }}&x={{nope}}"), "https://dev.example.com/api/me?t=abc&x={{nope}}");
         assert_eq!(scope.missing("{{baseUrl}}/{{nope}}"), vec!["nope".to_string()]);
+    }
+
+    #[test]
+    fn origin_names_the_nearest_layer() {
+        let mut scope = Scope::default();
+        scope.collection.insert("baseUrl".into(), "https://example.com".into());
+        scope.environment.insert("token".into(), "abc".into());
+        scope.folders = vec![Vars::from([("token".to_string(), "outer".to_string())]), Vars::new()];
+        assert_eq!(scope.origin("baseUrl"), Some(Origin::Collection));
+        assert_eq!(scope.origin("token"), Some(Origin::Folder(0)));
+        assert_eq!(scope.origin("$randomUUID"), Some(Origin::Dynamic));
+        assert_eq!(scope.origin("nope"), None);
     }
 
     #[test]

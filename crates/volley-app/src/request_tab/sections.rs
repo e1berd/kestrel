@@ -61,6 +61,22 @@ impl RequestTab {
     }
 
     pub(super) fn render_body(&self, cx: &mut Context<Self>) -> AnyElement {
+        let content: AnyElement = match self.body_kind.as_str() {
+            "none" => hint("This request sends no body.", cx).into_any_element(),
+            "form-urlencoded" | "multipart-form" => scroll("fields-scroll", self.body_fields.clone().into_any_element()),
+            "graphql" => {
+                let query = self.render_code_with_variables(&self.body, cx);
+                let variables = self.render_code_with_variables(&self.graphql_vars, cx);
+                v_flex()
+                    .size_full()
+                    .gap_2()
+                    .child(div().h(gpui::relative(0.62)).min_h_0().child(query))
+                    .child(hint("Variables", cx))
+                    .child(div().flex_1().min_h_0().child(variables))
+                    .into_any_element()
+            }
+            _ => self.render_code_with_variables(&self.body, cx),
+        };
         let tab = cx.entity().downgrade();
         let kinds = BODY_KINDS.iter().map(|(kind, label)| (kind.to_string(), label.to_string())).collect();
         let picker = segmented(
@@ -72,24 +88,17 @@ impl RequestTab {
             },
             cx,
         );
-        let content: AnyElement = match self.body_kind.as_str() {
-            "none" => hint("This request sends no body.", cx).into_any_element(),
-            "form-urlencoded" | "multipart-form" => scroll("fields-scroll", self.body_fields.clone().into_any_element()),
-            "graphql" => v_flex()
-                .size_full()
-                .gap_2()
-                .child(div().h(gpui::relative(0.62)).min_h_0().child(code_box(Editor::new(&self.body).bordered(false).h_full(), cx)))
-                .child(hint("Variables", cx))
-                .child(div().flex_1().min_h_0().child(code_box(Editor::new(&self.graphql_vars).bordered(false).h_full(), cx)))
-                .into_any_element(),
-            _ => code_box(Editor::new(&self.body).bordered(false).h_full(), cx).into_any_element(),
-        };
         v_flex()
             .size_full()
             .gap(dp(12.))
             .child(h_flex().min_w_0().child(picker))
             .child(div().flex_1().min_h_0().child(content))
             .into_any_element()
+    }
+
+    fn render_code_with_variables(&self, editor: &gpui::Entity<gpui_component::input::EditorState>, cx: &mut Context<Self>) -> AnyElement {
+        let code = code_box(Editor::new(editor).bordered(false).h_full(), cx).into_any_element();
+        self.with_clickable_variables(editor, code, cx)
     }
 
     pub(super) fn render_auth(&self, _window: &mut Window, cx: &mut Context<Self>) -> AnyElement {

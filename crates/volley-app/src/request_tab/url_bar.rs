@@ -3,7 +3,6 @@ use gpui::{
     Context, FontWeight, InteractiveElement as _, IntoElement, ParentElement as _, StatefulInteractiveElement as _, Styled, div, rems,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::input::Input;
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit_assets::IconName;
@@ -38,9 +37,7 @@ impl RequestTab {
                             .bg(palette.raised)
                             .shadow(appearance::elevation::lifted(cx))
                             .child(self.render_method_picker(cx))
-                            .child(
-                                div().flex_1().min_w_0().px(dp(4.)).font_family(MONO_FONT).child(Input::new(&self.url).appearance(false)),
-                            )
+                            .child(div().flex_1().min_w_0().px(dp(4.)).font_family(MONO_FONT).child(self.render_url_input(cx)))
                             .child(self.render_send_button(is_sending, cx)),
                     )
                     .child(self.render_save_button(cx)),
@@ -56,7 +53,7 @@ impl RequestTab {
                     .child(Icon::new(IconName::ArrowRight).xsmall())
                     .child(div().min_w_0().truncate().child(self.preview.clone()))
                     .when(!self.missing.is_empty(), |el| {
-                        el.child(div().flex_none().text_color(palette.warning).child(format!("not set: {}", self.missing.join(", "))))
+                        el.child(div().flex_none().text_color(palette.danger).child(format!("not set: {}", self.missing.join(", "))))
                     }),
             )
             .when(self.changed_on_disk, |el| el.child(self.render_disk_conflict(cx)))

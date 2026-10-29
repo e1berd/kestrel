@@ -11,6 +11,7 @@ pub mod report;
 mod request_builder;
 pub mod script;
 pub mod session;
+pub mod variable_home;
 pub mod vars;
 pub mod yaml;
 
@@ -20,6 +21,7 @@ pub use http::send;
 pub use outcome::{Outcome, Response, SentRequest};
 pub use plan::Plan;
 pub use session::Session;
+pub use variable_home::VariableHome;
 
 pub fn runtime() -> &'static tokio::runtime::Runtime {
     static RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();

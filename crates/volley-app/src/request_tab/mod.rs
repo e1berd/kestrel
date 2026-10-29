@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use gpui::{AppContext as _, Context, Entity, EventEmitter, IntoElement, ParentElement, Render, Styled, Subscription, Task, Window, div};
-use gpui_component::input::{EditorState, InputEvent, InputState};
+use gpui_component::input::{EditorState, InputEvent, InputState, TextDecorationCollection};
 use gpui_component::{WindowExt as _, h_resizable, resizable_panel, v_flex};
 use volley_core::format::{Auth, AuthConfig, Body, RequestFile};
 use volley_core::{Document, Outcome};
@@ -14,6 +14,8 @@ mod response_sections;
 mod sections;
 mod sending;
 mod url_bar;
+mod variable_marks;
+mod variable_popup;
 
 const METHODS: [&str; 7] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const BODY_KINDS: [(&str, &str); 7] = [
@@ -100,6 +102,8 @@ pub struct RequestTab {
     preview: String,
     missing: Vec<String>,
     token_status: Option<String>,
+    variable_popup: Option<variable_popup::VariablePopup>,
+    editor_marks: Vec<(gpui::EntityId, TextDecorationCollection)>,
     _subscriptions: Vec<Subscription>,
 }
 impl EventEmitter<TabEvent> for RequestTab {}
@@ -162,13 +166,18 @@ impl RequestTab {
             preview: String::new(),
             missing: Vec::new(),
             token_status: None,
+            variable_popup: None,
+            editor_marks: Vec::new(),
             _subscriptions: Vec::new(),
         };
         tab.build_auth_inputs(auth.config(), window, cx);
+        tab.tokenize_url(window, cx);
 
         let mut subscriptions = vec![
+            crate::appearance::observe_palette(cx, |tab, cx| tab.refresh_variable_marks(cx)),
             cx.subscribe_in(&tab.url, window, |tab, _, event: &InputEvent, window, cx| match event {
                 InputEvent::Change => {
+                    tab.tokenize_url(window, cx);
                     tab.sync_path_params(window, cx);
                     tab.changed(cx);
                 }
@@ -289,6 +298,7 @@ impl RequestTab {
         let http = file.http();
         self.method = if http.method.is_empty() { "GET".into() } else { http.method.to_uppercase() };
         self.url.update(cx, |input, cx| input.set_value(http.url.clone(), window, cx));
+        self.tokenize_url(window, cx);
         self.params.update(cx, |t, cx| t.set_items(&http.params, window, cx));
         self.headers.update(cx, |t, cx| t.set_items(&http.headers, window, cx));
         self.vars.update(cx, |t, cx| t.set_items(file.variables(), window, cx));
@@ -364,7 +374,7 @@ fn code_editor<T: 'static>(language: &'static str, text: String, window: &mut Wi
 impl Render for RequestTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = crate::appearance::palette(cx);
-        v_flex().size_full().child(self.render_url_bar(cx)).child(
+        v_flex().size_full().children(self.render_variable_popup(cx)).child(self.render_url_bar(cx)).child(
             div().flex_1().min_h_0().border_t_1().border_color(palette.border_soft).child(
                 h_resizable("request-response").child(resizable_panel().child(self.render_request(window, cx))).child(
                     resizable_panel()

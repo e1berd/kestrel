@@ -121,6 +121,7 @@ impl RequestTab {
     }
 
     pub(super) fn update_preview(&mut self, cx: &mut Context<Self>) {
+        self.refresh_variable_marks(cx);
         let file = self.build_file(cx);
         let project = self.project.read(cx);
         let Ok(plan) = Plan::with_file(&project.collection, &self.path, file, project.env.as_deref()) else { return };

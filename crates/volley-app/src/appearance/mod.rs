@@ -5,7 +5,7 @@ pub mod zoom;
 
 use std::borrow::Cow;
 
-use gpui::{App, Global, KeyBinding, Window, actions, px};
+use gpui::{App, Context, Global, KeyBinding, Subscription, Window, actions, px};
 use gpui_component::theme::{Theme, ThemeMode};
 use volley_core::report::report_error;
 
@@ -57,6 +57,10 @@ pub fn schemes(cx: &App) -> &[ColorScheme] {
 pub fn reload_schemes(cx: &mut App) {
     cx.set_global(Schemes(palette::load_all()));
     apply(None, cx);
+}
+
+pub fn observe_palette<T: 'static>(cx: &mut Context<T>, mut on_change: impl FnMut(&mut T, &mut Context<T>) + 'static) -> Subscription {
+    cx.observe_global::<ActivePalette>(move |view, cx| on_change(view, cx))
 }
 
 pub fn palette(cx: &App) -> Palette {

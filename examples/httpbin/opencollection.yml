@@ -10,6 +10,8 @@ request:
   variables:
     - name: baseUrl
       value: https://httpbin.org
+    - name: user
+      value: иуии
 
 docs:
   content: Requests against httpbin.org, to try Kestrel without a server of your own.
