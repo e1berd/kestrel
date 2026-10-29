@@ -42,6 +42,14 @@ impl Workspace {
         crate::import_dialog::open(cx.entity().downgrade(), window, cx);
     }
 
+    pub(super) fn prompt_codegen(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(view) = self.active_view() {
+            crate::codegen_dialog::open(view.read(cx).root(cx), window, cx);
+        } else {
+            window.push_notification(Notification::error("Open a collection to generate its SDK"), cx);
+        }
+    }
+
     pub(super) fn prompt_export(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(view) = self.active_view() {
             crate::export_dialog::open(view.read(cx).root(cx), window, cx);

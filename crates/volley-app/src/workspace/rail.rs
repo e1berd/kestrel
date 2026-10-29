@@ -102,6 +102,7 @@ impl Workspace {
                     .item(item("New collection…", Workspace::prompt_new_collection))
                     .item(item("Import collection…", Workspace::prompt_import))
                     .item(item("Export collection…", Workspace::prompt_export))
+                    .item(item("Generate SDK…", Workspace::prompt_codegen))
             },
         )
     }

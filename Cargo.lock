@@ -7541,6 +7541,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+ "volley-codegen",
  "volley-core",
  "volley-import",
  "volley-openapi",
@@ -7558,9 +7559,23 @@ dependencies = [
  "serde_yaml_ng",
  "tokio",
  "uuid",
+ "volley-codegen",
  "volley-core",
  "volley-import",
  "volley-openapi",
+]
+
+[[package]]
+name = "volley-codegen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "url",
+ "uuid",
+ "volley-core",
 ]
 
 [[package]]

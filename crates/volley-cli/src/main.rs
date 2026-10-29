@@ -3,87 +3,24 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::{Context as _, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::Parser;
 use futures::FutureExt as _;
 use futures::future::BoxFuture;
 use volley_core::oauth2::{Interact, browser_and_loopback};
 use volley_core::{Collection, Item, Plan, Session};
 use volley_openapi::{GroupBy, SyncOptions};
 
+mod args;
+mod codegen;
 mod importing;
 mod transfer;
 
-#[derive(Parser)]
-#[command(name = "kestrel-cli", version, about = "Kestrel from the terminal: run requests, import, export and sync collections")]
-struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    Export {
-        #[arg(default_value = ".")]
-        collection: PathBuf,
-        #[arg(short, long)]
-        out: PathBuf,
-        #[arg(long, default_value = "openapi32", value_parser = ["openapi30", "openapi31", "openapi32", "swagger20", "apidog"])]
-        format: String,
-        #[arg(long, default_value = "json", value_parser = ["json", "yaml"])]
-        encoding: String,
-        #[arg(long)]
-        overwrite: bool,
-    },
-    Run {
-        #[arg(default_value = ".")]
-        path: PathBuf,
-        #[arg(short, long)]
-        env: Option<String>,
-        #[arg(long = "var", value_parser = parse_pair)]
-        vars: Vec<(String, String)>,
-        #[arg(long)]
-        bail: bool,
-        #[arg(short, long)]
-        verbose: bool,
-        #[arg(long)]
-        json: bool,
-    },
-    Import {
-        spec: String,
-        #[arg(short, long)]
-        out: PathBuf,
-        #[arg(short, long)]
-        name: Option<String>,
-        #[arg(long, default_value = "tags")]
-        group_by: String,
-        #[arg(long, default_value = "auto", value_parser = ["auto", "openapi", "apidog"])]
-        format: String,
-    },
-    Sync {
-        #[arg(default_value = ".")]
-        collection: PathBuf,
-        #[arg(long)]
-        spec: Option<String>,
-        #[arg(long)]
-        group_by: Option<String>,
-        #[arg(long)]
-        prune: bool,
-        #[arg(long)]
-        dry_run: bool,
-    },
-    Envs {
-        #[arg(default_value = ".")]
-        collection: PathBuf,
-    },
-}
-
-fn parse_pair(text: &str) -> Result<(String, String), String> {
-    text.split_once('=').map(|(k, v)| (k.to_string(), v.to_string())).ok_or_else(|| format!("`{text}` is not name=value"))
-}
+use args::{Cli, Command};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
+        Command::Codegen { collection, out, language: _, overwrite } => codegen::generate(&collection, &out, overwrite).map(|_| true),
         Command::Export { collection, out, format, encoding, overwrite } => {
             importing::export(&collection, &out, &format, &encoding, overwrite).map(|_| true)
         }

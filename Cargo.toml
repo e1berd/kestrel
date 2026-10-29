@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-import", "crates/volley-cli", "crates/volley-app"]
+members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-import", "crates/volley-codegen", "crates/volley-cli", "crates/volley-app"]
 default-members = ["crates/volley-app"]
 
 [workspace.package]
@@ -14,6 +14,7 @@ rust-version = "1.88"
 volley-core = { path = "crates/volley-core" }
 volley-openapi = { path = "crates/volley-openapi" }
 volley-import = { path = "crates/volley-import" }
+volley-codegen = { path = "crates/volley-codegen" }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

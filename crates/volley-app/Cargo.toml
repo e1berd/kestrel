@@ -14,6 +14,7 @@ path = "src/main.rs"
 volley-core.workspace = true
 volley-openapi.workspace = true
 volley-import.workspace = true
+volley-codegen.workspace = true
 anyhow.workspace = true
 futures.workspace = true
 serde.workspace = true

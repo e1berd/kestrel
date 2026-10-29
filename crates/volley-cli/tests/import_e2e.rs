@@ -166,3 +166,5 @@ fn native_apidog_wrapped_and_flat_exports_import_through_the_cli() {
         }
     }
 }
+#[path = "import_e2e/codegen.rs"]
+mod codegen;

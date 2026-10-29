@@ -91,6 +91,7 @@ fn commands() -> Vec<Entry> {
         command("New collection…", "", Workspace::prompt_new_collection),
         command("Import collection…", "", Workspace::prompt_import),
         command("Export collection…", "", Workspace::prompt_export),
+        command("Generate SDK…", "", Workspace::prompt_codegen),
         command("Settings", "Ctrl ,", |_, window, cx| crate::settings::open(window, cx)),
         command("Switch light and dark theme", "", |_, _, cx| {
             let next = if gpui_component::Theme::global(cx).is_dark() { ThemeChoice::Light } else { ThemeChoice::Dark };

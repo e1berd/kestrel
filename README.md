@@ -14,10 +14,11 @@ Code name: **volley**.
 - **Scripts and tests**: before-request and after-response scripts and `test()` / `expect()` with Bruno's API (`bru`, `req`, `res`) in QuickJS, `require('jsonwebtoken')` included.
 - **Imports**: OpenAPI 3.0 / 3.1 / 3.2 and Swagger 2.0 in JSON or YAML, and native Apidog JSON exports. Preview requests, folders and conversion warnings before choosing an empty destination folder.
 - **Exports**: OpenAPI 3.0 / 3.1 / 3.2, Swagger 2.0 and Apidog, with streaming file handling and actual stage progress in both transfer dialogs.
+- **SDK generation**: standalone TypeScript clients with resource methods such as `client.users.list()`, `.insert()`, `.update()` and `.delete()`, directly from saved requests.
 - **OpenAPI sync**: sync an imported collection as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
 - **Several projects open at once**, each with its own tabs; switch from the rail on the left or with Ctrl+Shift+[ / ].
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
-- **CLI** for terminals and CI: `kestrel-cli run`, `import`, `export`, `sync`.
+- **CLI** for terminals and CI: `kestrel-cli run`, `import`, `export`, `codegen`, `sync`.
 
 ## Build
 
@@ -67,6 +68,14 @@ Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apido
 ```bash
 kestrel-cli sync path/to/collection
 ```
+
+Choose **Generate SDK…** from the collection menu or command palette, or run:
+
+```bash
+kestrel-cli codegen path/to/collection --out sdk/client.ts
+```
+
+The generated TypeScript SDK uses fetch without runtime dependencies. It infers nested resources from URLs, requires path arguments, supports query parameters, bodies and inherited authentication, and accepts credentials and variables at runtime. Use `--overwrite` to replace an SDK. See the [SDK guide](crates/volley-codegen/README.md) for API examples, explicit names, authentication and limitations.
 
 ## Shortcuts
 
