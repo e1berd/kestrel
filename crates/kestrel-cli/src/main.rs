@@ -17,14 +17,22 @@ mod transfer;
 
 use args::{Cli, Command};
 
+fn data_layer(tanstack_query: Option<args::QueryFlavor>, rstore: bool) -> kestrel_codegen::DataLayer {
+    match (tanstack_query, rstore) {
+        (_, true) => kestrel_codegen::DataLayer::Rstore,
+        (Some(flavor), false) => flavor.into(),
+        (None, false) => kestrel_codegen::DataLayer::None,
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Mcp { collection } => kestrel_mcp::serve(&collection).map(|_| true),
-        Command::Codegen { collection, out, language: _, single_file, archive, tanstack_query, overwrite } => codegen::generate(
+        Command::Codegen { collection, out, language: _, single_file, archive, tanstack_query, rstore, overwrite } => codegen::generate(
             &collection,
             &out,
-            kestrel_codegen::OutputOptions { single_file, archive, query: tanstack_query.map(Into::into).unwrap_or_default() },
+            kestrel_codegen::OutputOptions { single_file, archive, data_layer: data_layer(tanstack_query, rstore) },
             overwrite,
         )
         .map(|_| true),

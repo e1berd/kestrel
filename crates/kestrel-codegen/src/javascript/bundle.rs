@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use kestrel_core::transfer::Progress;
 
-use crate::{QueryAdapter, Resource};
+use crate::{DataLayer, Resource};
 
 use super::query::{self, Typings};
 use super::{Files, insert};
@@ -13,14 +13,14 @@ pub(super) fn generate(
     root: &Resource,
     services: &BTreeMap<String, String>,
     plugins: &[(&str, &str, &str)],
-    query: QueryAdapter,
+    data_layer: DataLayer,
     progress: &Progress,
-) -> Result<(Files, Vec<String>)> {
+) -> Result<(Files, Vec<String>, Vec<String>)> {
     let mut javascript = String::new();
     let mut declarations = String::new();
     let mut packages = BTreeSet::new();
     let mut package_types = BTreeSet::new();
-    let templates = super::runtime::files(query);
+    let templates = super::runtime::files(data_layer);
     for name in [
         "web",
         "runtime",
@@ -72,18 +72,25 @@ pub(super) fn generate(
     let mut names = BTreeMap::new();
     super::register(root, &[], &mut names, &mut BTreeSet::new());
     let mut methods = Vec::new();
-    Renderer { names: &names, javascript: &mut javascript, declarations: &mut declarations, methods: &mut methods, query }.render(
+    Renderer { names: &names, javascript: &mut javascript, declarations: &mut declarations, methods: &mut methods, data_layer }.render(
         root,
         &[],
         progress,
     )?;
     javascript.push_str("\n/** @param {import('./client.js').ClientOptions} [options] */\nexport function createClient(options = {}) {\n  return new Client(options);\n}\n");
     declarations.push_str("export declare function createClient(options?: ClientOptions): Client;\n");
+    let mut warnings = Vec::new();
+    if data_layer == DataLayer::Rstore {
+        let rstore = super::rstore::generate(root)?;
+        warnings.extend(rstore.skipped);
+        javascript.push_str(&format!("import {{ withItemType }} from '@rstore/vue';\n{}", rstore.javascript));
+        declarations.push_str(&rstore.declarations);
+    }
     let mut files = Files::new();
     let javascript = format!("{}{javascript}", packages.into_iter().map(|line| format!("{line}\n")).collect::<String>());
     let declarations = format!("{}{declarations}", package_types.into_iter().map(|line| format!("{line}\n")).collect::<String>());
     insert(&mut files, Path::new("client.js"), javascript, declarations);
-    Ok((files, methods))
+    Ok((files, methods, warnings))
 }
 
 fn package_imports(source: &str) -> impl Iterator<Item = String> + '_ {
@@ -115,7 +122,7 @@ struct Renderer<'a> {
     javascript: &'a mut String,
     declarations: &'a mut String,
     methods: &'a mut Vec<String>,
-    query: QueryAdapter,
+    data_layer: DataLayer,
 }
 
 impl Renderer<'_> {
@@ -126,9 +133,9 @@ impl Renderer<'_> {
             self.render(child, &child_path, progress)?;
         }
         progress.check()?;
-        let Self { names, javascript, declarations, methods, query } = self;
-        let query = *query;
-        let typings = Typings::bundled(query);
+        let Self { names, javascript, declarations, methods, data_layer } = self;
+        let data_layer = *data_layer;
+        let typings = Typings::bundled(data_layer);
         let class = &names[path];
         javascript.push_str(&format!("\nexport class {class} extends Resource {{\n"));
         let mut class_types = format!("\nexport declare class {class} extends Resource {{\n");
@@ -154,7 +161,7 @@ impl Renderer<'_> {
                 None => "null".into(),
             };
             let creation = format!("createCallable(this[resourceExecutor], {descriptor}, {collection})");
-            let creation = match query::wrapper(query) {
+            let creation = match query::wrapper(data_layer) {
                 Some((symbol, _)) => format!("{symbol}({creation}, this[resourceExecutor])"),
                 None => creation,
             };

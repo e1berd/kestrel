@@ -7,6 +7,7 @@ const sdk = await import(pathToFileURL(process.argv[2]).href);
 const { createClient, ApiError } = sdk;
 const { verifyTanStack } = await import("./tanstack.mjs");
 await verifyTanStack(sdk);
+if (process.env.KESTREL_QUERY_ADAPTER === "rstore") await (await import("./rstore.mjs")).verifyRstore(sdk);
 const { verifyEvents, verifyRemoval } = await import("./events.mjs");
 await verifyEvents(sdk);
 await verifyRemoval(sdk);

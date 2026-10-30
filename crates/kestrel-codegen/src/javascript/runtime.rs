@@ -1,10 +1,10 @@
 use std::path::Path;
 
-use crate::QueryAdapter;
+use crate::DataLayer;
 
 use super::{Files, insert};
 
-pub(super) fn files(query: QueryAdapter) -> Files {
+pub(super) fn files(data_layer: DataLayer) -> Files {
     let mut files = Files::new();
     macro_rules! template {
         ($name:literal) => {
@@ -26,10 +26,10 @@ pub(super) fn files(query: QueryAdapter) -> Files {
     template!("executor");
     template!("collection");
     template!("callable");
-    if query.is_enabled() {
+    if data_layer.uses_tanstack_query() {
         template!("tanstack");
     }
-    if query == QueryAdapter::Vue {
+    if data_layer == DataLayer::TanstackQueryVue {
         template!("tanstack-vue");
     }
     files

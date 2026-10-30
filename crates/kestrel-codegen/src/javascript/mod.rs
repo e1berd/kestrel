@@ -3,6 +3,7 @@ mod bundle;
 mod modules;
 mod operation;
 mod query;
+mod rstore;
 mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,12 +22,11 @@ pub(crate) fn generate(
     plugins: &[(&str, &str, &str)],
     options: OutputOptions,
     progress: &Progress,
-) -> Result<(Files, Vec<String>)> {
+) -> Result<(Files, Vec<String>, Vec<String>)> {
     if options.single_file {
-        return bundle::generate(root, services, plugins, options.query, progress);
+        return bundle::generate(root, services, plugins, options.data_layer, progress);
     }
-    let (files, methods) = modules::generate(root, services, plugins, options.query, progress)?;
-    Ok((files, methods))
+    modules::generate(root, services, plugins, options.data_layer, progress)
 }
 
 fn insert(files: &mut Files, path: &Path, javascript: String, declarations: String) {

@@ -49,7 +49,7 @@ impl Generator {
     }
 
     pub fn generate(&self, collection: &Collection, progress: &Progress) -> Result<Generated> {
-        let (mut resources, warnings) = crate::resources(collection, progress)?;
+        let (mut resources, mut warnings) = crate::resources(collection, progress)?;
         let mut names = BTreeSet::new();
         for plugin in &self.plugins {
             progress.check()?;
@@ -62,7 +62,8 @@ impl Generator {
         services::synchronize(&mut resources, &[], &mut services)?;
         progress.start("Generating JavaScript client", None, Unit::Requests)?;
         let plugins: Vec<_> = self.plugins.iter().map(|plugin| (plugin.name(), plugin.runtime(), plugin.declarations())).collect();
-        let (files, methods) = javascript::generate(&resources, &services, &plugins, self.output, progress)?;
+        let (files, methods, generation_warnings) = javascript::generate(&resources, &services, &plugins, self.output, progress)?;
+        warnings.extend(generation_warnings);
         Ok(Generated {
             files,
             entrypoint: if self.output.single_file { "client.js".into() } else { "index.js".into() },

@@ -25,16 +25,17 @@ pub use security::Authentication;
 pub use writing::generate_to;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum QueryAdapter {
+pub enum DataLayer {
     #[default]
     None,
-    React,
-    Vue,
+    TanstackQueryReact,
+    TanstackQueryVue,
+    Rstore,
 }
 
-impl QueryAdapter {
-    pub fn is_enabled(self) -> bool {
-        self != Self::None
+impl DataLayer {
+    pub fn uses_tanstack_query(self) -> bool {
+        matches!(self, Self::TanstackQueryReact | Self::TanstackQueryVue)
     }
 }
 
@@ -42,7 +43,7 @@ impl QueryAdapter {
 pub struct OutputOptions {
     pub single_file: bool,
     pub archive: bool,
-    pub query: QueryAdapter,
+    pub data_layer: DataLayer,
 }
 
 #[derive(Debug, Clone)]

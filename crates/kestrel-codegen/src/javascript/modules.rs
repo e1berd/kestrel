@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use kestrel_core::transfer::Progress;
 
-use crate::{QueryAdapter, Resource};
+use crate::{DataLayer, Resource};
 
 use super::aggregate::{self, GROUP_SIZE, import_path};
 use super::{Files, insert};
@@ -28,14 +28,26 @@ pub(super) fn generate(
     root: &Resource,
     services: &BTreeMap<String, String>,
     plugins: &[(&str, &str, &str)],
-    query: QueryAdapter,
+    data_layer: DataLayer,
     progress: &Progress,
-) -> Result<(Files, Vec<String>)> {
-    let mut modules = Modules { files: super::runtime::files(query), ..Default::default() };
+) -> Result<(Files, Vec<String>, Vec<String>)> {
+    let mut modules = Modules { files: super::runtime::files(data_layer), ..Default::default() };
     let mut names = BTreeMap::new();
     super::register(root, &[], &mut names, &mut BTreeSet::new());
-    resources(root, &[], &names, &mut modules, query, progress)?;
+    resources(root, &[], &names, &mut modules, data_layer, progress)?;
     registry(&mut modules)?;
+    let mut warnings = Vec::new();
+    let mut exports =
+        vec![PathBuf::from("client.js"), "services.js".into(), "operations.js".into(), "generation.js".into(), "lib/web.js".into()];
+    if data_layer == DataLayer::Rstore {
+        let rstore = super::rstore::generate(root)?;
+        warnings.extend(rstore.skipped);
+        let javascript =
+            format!("import {{ withItemType }} from '@rstore/vue';\nimport {{ ApiError }} from './lib/web.js';\n{}", rstore.javascript);
+        let declarations = format!("import type {{ Client }} from './client.js';\n{}", rstore.declarations);
+        insert(&mut modules.files, Path::new("rstore.js"), javascript, declarations);
+        exports.push("rstore.js".into());
+    }
     let service_values = serde_json::to_string(services)?;
     let service_types = services
         .iter()
@@ -60,8 +72,6 @@ pub(super) fn generate(
         "export declare const generation: { readonly version: 1; readonly plugins: readonly string[] };\n".into(),
     );
     let index = Path::new("index.js");
-    let mut exports =
-        vec![PathBuf::from("client.js"), "services.js".into(), "operations.js".into(), "generation.js".into(), "lib/web.js".into()];
     exports.extend(modules.classes);
     let mut source = aggregate::exports(&mut modules.files, Path::new("exports"), exports)
         .iter()
@@ -88,7 +98,7 @@ pub(super) fn generate(
         source.push_str(&format!("export * from '{}';\n", import_path(index, &path)));
     }
     insert(&mut modules.files, index, source, declarations);
-    Ok((modules.files, modules.methods))
+    Ok((modules.files, modules.methods, warnings))
 }
 
 fn resources(
@@ -96,7 +106,7 @@ fn resources(
     path: &[String],
     names: &BTreeMap<Vec<String>, String>,
     modules: &mut Modules,
-    query: QueryAdapter,
+    data_layer: DataLayer,
     progress: &Progress,
 ) -> Result<PathBuf> {
     let class = &names[path];
@@ -105,7 +115,7 @@ fn resources(
     for (name, child) in &root.resources {
         let mut child_path = path.to_vec();
         child_path.push(name.clone());
-        let module = resources(child, &child_path, names, modules, query, progress)?;
+        let module = resources(child, &child_path, names, modules, data_layer, progress)?;
         members.push(Member { name: name.clone(), module, symbol: names[&child_path].clone(), constructor: true });
     }
     let mut filenames = BTreeSet::new();
@@ -118,7 +128,7 @@ fn resources(
             suffix += 1;
         }
         let module = PathBuf::from(format!("operations/{class}/{filename}.js"));
-        super::operation::generate(&mut modules.files, operation, &module, query)?;
+        super::operation::generate(&mut modules.files, operation, &module, data_layer)?;
         modules.operations.push((operation.transport.id.clone(), module.clone()));
         modules.methods.push(operation.transport.id.clone());
         members.push(Member { name: name.clone(), module, symbol: "createOperation".into(), constructor: false });

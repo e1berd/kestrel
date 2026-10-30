@@ -2,17 +2,18 @@ use std::ffi::OsStr;
 use std::path::Path;
 use std::process::Command;
 
-use kestrel_codegen::{OutputOptions, QueryAdapter};
+use kestrel_codegen::{DataLayer, OutputOptions};
 use kestrel_core::transfer::Progress;
 
-pub fn verify(directory: &Path, collection: &Path, microservices: &Path, compiler: &OsStr, query: QueryAdapter, label: &str) {
+pub fn verify(directory: &Path, collection: &Path, microservices: &Path, compiler: &OsStr, data_layer: DataLayer, label: &str) {
     let sdk = directory.join("sdk");
     let other = directory.join("micro-sdk");
-    kestrel_codegen::generate_to(collection, &sdk, OutputOptions { query, ..Default::default() }, false, &Progress::default()).unwrap();
-    kestrel_codegen::generate_to(microservices, &other, OutputOptions { query, ..Default::default() }, false, &Progress::default())
+    kestrel_codegen::generate_to(collection, &sdk, OutputOptions { data_layer, ..Default::default() }, false, &Progress::default())
+        .unwrap();
+    kestrel_codegen::generate_to(microservices, &other, OutputOptions { data_layer, ..Default::default() }, false, &Progress::default())
         .unwrap();
     let valid = directory.join("valid-modules.ts");
-    let source = valid_source(query).replace("./client.js", "./sdk/index.js");
+    let source = valid_source(data_layer).replace("./client.js", "./sdk/index.js");
     std::fs::write(&valid, source).unwrap();
     let output = Command::new("node")
         .arg(compiler)
@@ -27,6 +28,7 @@ pub fn verify(directory: &Path, collection: &Path, microservices: &Path, compile
             "--module",
             "NodeNext",
         ])
+        .args(skip_library_check(label))
         .arg(&valid)
         .arg(other.join("index.d.ts"))
         .output()
@@ -43,15 +45,21 @@ pub fn verify(directory: &Path, collection: &Path, microservices: &Path, compile
     assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
 }
 
-pub fn valid_source(query: QueryAdapter) -> String {
+pub fn skip_library_check(label: &str) -> &'static [&'static str] {
+    if label == "rstore" { &["--skipLibCheck"] } else { &[] }
+}
+
+pub fn valid_source(data_layer: DataLayer) -> String {
     let mut source = include_str!("../valid.ts").to_string();
-    if query == QueryAdapter::Vue {
+    if data_layer == DataLayer::TanstackQueryVue {
         source.push_str(include_str!("../vue-valid.ts"));
         if let Some(package) = std::env::var_os("KESTREL_TANSTACK_QUERY_VUE") {
             let module = serde_json::to_string(&package.to_string_lossy()).unwrap();
             source.push_str(&format!("\nimport {{ useQuery, useMutation }} from {module};\nconst observed = useQuery(client.users.get.queryOptions<User>({{ userId }}));\nconst observedUser: User | undefined = observed.data.value;\nconst observedList = useQuery(client.users.list.queryOptions<User>());\nconst observedUsers: User[] | undefined = observedList.data.value;\nconst mutate = useMutation(client.users.insert.mutationOptions<User>());\nmutate.mutate({{ body: {{ name: 'Ada' }} }});\nvoid observedUser;\nvoid observedUsers;\n"));
         }
-    } else if query.is_enabled() {
+    } else if data_layer == DataLayer::Rstore {
+        source.push_str(include_str!("../rstore-valid.ts"));
+    } else if data_layer.uses_tanstack_query() {
         source.push_str(include_str!("../tanstack-valid.ts"));
         if let Some(package) = std::env::var_os("KESTREL_TANSTACK_QUERY_REACT") {
             let module = serde_json::to_string(&package.to_string_lossy()).unwrap();

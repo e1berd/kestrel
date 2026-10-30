@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
-use kestrel_codegen::QueryAdapter;
+use kestrel_codegen::DataLayer;
 
 #[derive(Clone, Copy, ValueEnum)]
 pub(super) enum QueryFlavor {
@@ -9,11 +9,11 @@ pub(super) enum QueryFlavor {
     Vue,
 }
 
-impl From<QueryFlavor> for QueryAdapter {
+impl From<QueryFlavor> for DataLayer {
     fn from(flavor: QueryFlavor) -> Self {
         match flavor {
-            QueryFlavor::React => Self::React,
-            QueryFlavor::Vue => Self::Vue,
+            QueryFlavor::React => Self::TanstackQueryReact,
+            QueryFlavor::Vue => Self::TanstackQueryVue,
         }
     }
 }
@@ -47,8 +47,10 @@ pub(super) enum Command {
         single_file: bool,
         #[arg(long)]
         archive: bool,
-        #[arg(long, value_enum, num_args = 0..=1, default_missing_value = "react")]
+        #[arg(long, value_enum, num_args = 0..=1, default_missing_value = "react", conflicts_with = "rstore")]
         tanstack_query: Option<QueryFlavor>,
+        #[arg(long)]
+        rstore: bool,
         #[arg(long)]
         overwrite: bool,
     },

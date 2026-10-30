@@ -6,18 +6,25 @@ use gpui::{
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
 use gpui_component::{Disableable as _, WindowExt as _, h_flex, v_flex};
-use kestrel_codegen::QueryAdapter;
+use kestrel_codegen::DataLayer;
 
 use super::CodegenDialog;
 use crate::appearance::{self, dp};
 use crate::ui::{eyebrow, hint};
 
+const DATA_LAYERS: [(&str, &str, DataLayer); 3] = [
+    ("codegen-tanstack-react", "TanStack Query for React", DataLayer::TanstackQueryReact),
+    ("codegen-tanstack-vue", "TanStack Query for Vue", DataLayer::TanstackQueryVue),
+    ("codegen-rstore", "rstore collections (Vue)", DataLayer::Rstore),
+];
+
 impl CodegenDialog {
     fn render_output_options(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        v_flex()
-            .gap(dp(10.))
-            .child(self.render_query_adapter("codegen-tanstack-react", "TanStack Query for React", QueryAdapter::React, cx))
-            .child(self.render_query_adapter("codegen-tanstack-vue", "TanStack Query for Vue", QueryAdapter::Vue, cx))
+        let mut options = v_flex().gap(dp(10.));
+        for (id, label, layer) in DATA_LAYERS {
+            options = options.child(self.render_data_layer(id, label, layer, cx));
+        }
+        options
             .child(
                 Checkbox::new("codegen-single-file")
                     .label("Bundle JavaScript into one file (+ .d.ts)")
@@ -46,16 +53,10 @@ impl CodegenDialog {
             )
     }
 
-    fn render_query_adapter(
-        &self,
-        id: &'static str,
-        label: &'static str,
-        adapter: QueryAdapter,
-        cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        Checkbox::new(id).label(label).checked(self.output.query == adapter).disabled(self.busy).on_click(cx.listener(
+    fn render_data_layer(&self, id: &'static str, label: &'static str, adapter: DataLayer, cx: &mut Context<Self>) -> impl IntoElement {
+        Checkbox::new(id).label(label).checked(self.output.data_layer == adapter).disabled(self.busy).on_click(cx.listener(
             move |view, checked: &bool, _, cx| {
-                view.output.query = if *checked { adapter } else { QueryAdapter::None };
+                view.output.data_layer = if *checked { adapter } else { DataLayer::None };
                 view.report = None;
                 view.error = None;
                 cx.notify();

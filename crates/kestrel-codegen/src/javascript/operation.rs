@@ -2,19 +2,19 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::{Operation, QueryAdapter};
+use crate::{DataLayer, Operation};
 
 use super::query::{self, Typings};
 
 use super::aggregate::import_path;
 use super::{Files, insert};
 
-pub(super) fn generate(files: &mut Files, operation: &Operation, path: &Path, query: QueryAdapter) -> Result<()> {
+pub(super) fn generate(files: &mut Files, operation: &Operation, path: &Path, data_layer: DataLayer) -> Result<()> {
     let web = import_path(path, Path::new("lib/web.js"));
     let collection = import_path(path, Path::new("lib/collection.js"));
     let callable_module = import_path(path, Path::new("lib/callable.js"));
     let mut javascript = format!("import {{ defineOperation }} from '{web}';\nimport {{ createCallable }} from '{callable_module}';\n");
-    let wrapper = query::wrapper(query);
+    let wrapper = query::wrapper(data_layer);
     if let Some((symbol, library)) = wrapper {
         let adapter = import_path(path, Path::new(library));
         javascript.push_str(&format!("import {{ {symbol} }} from '{adapter}';\n"));
@@ -38,7 +38,7 @@ pub(super) fn generate(files: &mut Files, operation: &Operation, path: &Path, qu
     let mut declarations = format!(
         "import type {{ QueryValue, SearchParams, RequestOptions, Operation{json_type} }} from '{web}';\nimport type {{ Executor{collection_type} }} from '{collection}';\nexport declare const operation: Operation;\n"
     );
-    declarations.push_str(&callable(operation, "Callable", "typeof operation", &Typings::for_module(query, path))?);
+    declarations.push_str(&callable(operation, "Callable", "typeof operation", &Typings::for_module(data_layer, path))?);
     declarations.push_str("export declare function createOperation(execute: Executor): Callable;\n");
     insert(files, path, javascript, declarations);
     Ok(())

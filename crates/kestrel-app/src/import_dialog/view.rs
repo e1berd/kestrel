@@ -146,7 +146,7 @@ impl ImportDialog {
 }
 
 impl Render for ImportDialog {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_openapi =
             self.prepared.as_ref().map(|prepared| prepared.preview.format) == Some(Format::OpenApi) || self.format == Some(Format::OpenApi);
         v_flex()
@@ -155,7 +155,7 @@ impl Render for ImportDialog {
             .child(
                 v_flex()
                     .id("import-content")
-                    .max_h(rems(25.))
+                    .max_h(window.viewport_size().height * 0.65)
                     .overflow_y_scroll()
                     .gap(dp(18.))
                     .child(self.render_format_picker(cx))

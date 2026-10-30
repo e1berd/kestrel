@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use kestrel_codegen::QueryAdapter;
+use kestrel_codegen::DataLayer;
 use kestrel_core::Collection;
 use kestrel_core::format::{Auth, AuthConfig, Body, Defaults, KeyValue, RequestFile};
 use kestrel_core::transfer::Progress;
@@ -107,17 +107,22 @@ fn generated_sdk_sends_requests_and_obeys_its_types() {
         microservices.add_request(&microservices_root, request).unwrap();
     }
     let vue_package = std::env::var_os("KESTREL_VUE").map(PathBuf::from);
-    let adapters = [(QueryAdapter::None, "plain"), (QueryAdapter::React, "react")]
+    let rstore_modules = std::env::var_os("KESTREL_RSTORE_MODULES").map(PathBuf::from);
+    let adapters = [(DataLayer::None, "plain"), (DataLayer::TanstackQueryReact, "react")]
         .into_iter()
-        .chain(vue_package.is_some().then_some((QueryAdapter::Vue, "vue")));
-    for (query, label) in adapters {
+        .chain(vue_package.is_some().then_some((DataLayer::TanstackQueryVue, "vue")))
+        .chain(rstore_modules.is_some().then_some((DataLayer::Rstore, "rstore")));
+    for (data_layer, label) in adapters {
         let directory = directory.0.join(label);
         std::fs::create_dir(&directory).unwrap();
-        if let Some(package) = vue_package.as_ref().filter(|_| query == QueryAdapter::Vue) {
+        if let Some(package) = vue_package.as_ref().filter(|_| data_layer == DataLayer::TanstackQueryVue) {
             std::fs::create_dir(directory.join("node_modules")).unwrap();
             std::os::unix::fs::symlink(package, directory.join("node_modules/vue")).unwrap();
         }
-        let single_file = kestrel_codegen::OutputOptions { single_file: true, query, ..Default::default() };
+        if let Some(modules) = rstore_modules.as_ref().filter(|_| data_layer == DataLayer::Rstore) {
+            std::os::unix::fs::symlink(modules, directory.join("node_modules")).unwrap();
+        }
+        let single_file = kestrel_codegen::OutputOptions { single_file: true, data_layer, ..Default::default() };
         let other_destination = directory.join("microservices.js");
         kestrel_codegen::generate_to(&microservices_root, &other_destination, single_file, false, &Progress::default()).unwrap();
         let destination = directory.join("client.js");
@@ -125,7 +130,7 @@ fn generated_sdk_sends_requests_and_obeys_its_types() {
         kestrel_codegen::generate_to(&root, &destination, single_file, false, &Progress::default()).unwrap();
         if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
             let valid = directory.join("valid.ts");
-            std::fs::write(&valid, runtime_output::valid_source(query)).unwrap();
+            std::fs::write(&valid, runtime_output::valid_source(data_layer)).unwrap();
             let output = Command::new("node")
                 .arg(&compiler)
                 .args([
@@ -139,6 +144,7 @@ fn generated_sdk_sends_requests_and_obeys_its_types() {
                     "NodeNext",
                     "--allowImportingTsExtensions",
                 ])
+                .args(runtime_output::skip_library_check(label))
                 .arg(&valid)
                 .output()
                 .expect("typecheck generated SDK");
@@ -178,7 +184,7 @@ fn generated_sdk_sends_requests_and_obeys_its_types() {
             .expect("run Node.js 24");
         assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
         if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
-            runtime_output::verify(&directory, &root, &microservices_root, &compiler, query, label);
+            runtime_output::verify(&directory, &root, &microservices_root, &compiler, data_layer, label);
         }
     }
 }
