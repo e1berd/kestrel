@@ -1,0 +1,13 @@
+import { ref } from 'vue';
+const userId = ref<string | undefined>('42');
+const vueQuery = client.users.get.queryOptions<User>({ userId });
+const vueKey: readonly unknown[] = vueQuery.queryKey.value;
+const vueReady: boolean = vueQuery.enabled.value;
+const vueResult: Promise<User> = vueQuery.queryFn({ signal: new AbortController().signal });
+const getterQuery = client.users.get.queryOptions<User>(() => ({ userId: userId.value }));
+const vueList = client.users.list.queryOptions<User>();
+const vueListResult: Promise<User[]> = vueList.queryFn({ signal: new AbortController().signal });
+const vueMutation = client.users.insert.mutationOptions<User>();
+const vueMutationResult: Promise<User> = vueMutation.mutationFn({ body: { name: 'Ada' } });
+const vuePrefix: readonly unknown[] = client.users.get.queryKey();
+void [vueKey, vueReady, vueResult, getterQuery, vueListResult, vueMutationResult, vuePrefix];

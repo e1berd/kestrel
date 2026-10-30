@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use kestrel_core::transfer::Progress;
 
-use crate::Resource;
+use crate::{QueryAdapter, Resource};
 
 use super::aggregate::{self, GROUP_SIZE, import_path};
 use super::{Files, insert};
@@ -28,13 +28,13 @@ pub(super) fn generate(
     root: &Resource,
     services: &BTreeMap<String, String>,
     plugins: &[(&str, &str, &str)],
-    tanstack_query: bool,
+    query: QueryAdapter,
     progress: &Progress,
 ) -> Result<(Files, Vec<String>)> {
-    let mut modules = Modules { files: super::runtime::files(tanstack_query), ..Default::default() };
+    let mut modules = Modules { files: super::runtime::files(query), ..Default::default() };
     let mut names = BTreeMap::new();
     super::register(root, &[], &mut names, &mut BTreeSet::new());
-    resources(root, &[], &names, &mut modules, tanstack_query, progress)?;
+    resources(root, &[], &names, &mut modules, query, progress)?;
     registry(&mut modules)?;
     let service_values = serde_json::to_string(services)?;
     let service_types = services
@@ -96,7 +96,7 @@ fn resources(
     path: &[String],
     names: &BTreeMap<Vec<String>, String>,
     modules: &mut Modules,
-    tanstack_query: bool,
+    query: QueryAdapter,
     progress: &Progress,
 ) -> Result<PathBuf> {
     let class = &names[path];
@@ -105,7 +105,7 @@ fn resources(
     for (name, child) in &root.resources {
         let mut child_path = path.to_vec();
         child_path.push(name.clone());
-        let module = resources(child, &child_path, names, modules, tanstack_query, progress)?;
+        let module = resources(child, &child_path, names, modules, query, progress)?;
         members.push(Member { name: name.clone(), module, symbol: names[&child_path].clone(), constructor: true });
     }
     let mut filenames = BTreeSet::new();
@@ -118,7 +118,7 @@ fn resources(
             suffix += 1;
         }
         let module = PathBuf::from(format!("operations/{class}/{filename}.js"));
-        super::operation::generate(&mut modules.files, operation, &module, tanstack_query)?;
+        super::operation::generate(&mut modules.files, operation, &module, query)?;
         modules.operations.push((operation.transport.id.clone(), module.clone()));
         modules.methods.push(operation.transport.id.clone());
         members.push(Member { name: name.clone(), module, symbol: "createOperation".into(), constructor: false });

@@ -6,6 +6,7 @@ use gpui::{
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::checkbox::Checkbox;
 use gpui_component::{Disableable as _, WindowExt as _, h_flex, v_flex};
+use kestrel_codegen::QueryAdapter;
 
 use super::CodegenDialog;
 use crate::appearance::{self, dp};
@@ -15,18 +16,8 @@ impl CodegenDialog {
     fn render_output_options(&self, cx: &mut Context<Self>) -> impl IntoElement {
         v_flex()
             .gap(dp(10.))
-            .child(
-                Checkbox::new("codegen-tanstack-query")
-                    .label("Generate TanStack Query options")
-                    .checked(self.output.tanstack_query)
-                    .disabled(self.busy)
-                    .on_click(cx.listener(|view, checked: &bool, _, cx| {
-                        view.output.tanstack_query = *checked;
-                        view.report = None;
-                        view.error = None;
-                        cx.notify();
-                    })),
-            )
+            .child(self.render_query_adapter("codegen-tanstack-react", "TanStack Query for React", QueryAdapter::React, cx))
+            .child(self.render_query_adapter("codegen-tanstack-vue", "TanStack Query for Vue", QueryAdapter::Vue, cx))
             .child(
                 Checkbox::new("codegen-single-file")
                     .label("Bundle JavaScript into one file (+ .d.ts)")
@@ -53,6 +44,23 @@ impl CodegenDialog {
                         cx.notify();
                     })),
             )
+    }
+
+    fn render_query_adapter(
+        &self,
+        id: &'static str,
+        label: &'static str,
+        adapter: QueryAdapter,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement {
+        Checkbox::new(id).label(label).checked(self.output.query == adapter).disabled(self.busy).on_click(cx.listener(
+            move |view, checked: &bool, _, cx| {
+                view.output.query = if *checked { adapter } else { QueryAdapter::None };
+                view.report = None;
+                view.error = None;
+                cx.notify();
+            },
+        ))
     }
 
     fn render_destination(&self, cx: &mut Context<Self>) -> impl IntoElement {

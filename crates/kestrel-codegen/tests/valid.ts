@@ -56,3 +56,12 @@ void pages;
 void resource;
 void usersResource;
 void messagesResource;
+
+const stopListening = new AbortController();
+client.requestFilter({ method: "POST", status: [200, "201", "4xx"], url: "*.example.com/users/:id" }).addEventListener("success", (event) => {
+  const status: number = event.response.status;
+  const identifier: string = event.operation.id;
+  void [status, identifier, event.data];
+}, { signal: stopListening.signal });
+client.users.requestFilter("method: GET").addEventListener("error", { handleEvent: (event) => void event.error });
+stopListening.abort();

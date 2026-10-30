@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::path::{Path, PathBuf};
 
-use kestrel_codegen::{OutputOptions, generate, generate_to};
+use kestrel_codegen::{OutputOptions, QueryAdapter, generate, generate_to};
 use kestrel_core::format::RequestFile;
 use kestrel_core::transfer::Progress;
 use kestrel_core::{Collection, Document, Item, Request};
@@ -49,18 +49,18 @@ fn read_zip(path: &Path) -> BTreeMap<PathBuf, String> {
 fn the_default_is_a_directory_and_the_two_output_flags_are_independent() {
     let fixture = Fixture::new();
     assert_eq!(OutputOptions::default(), OutputOptions { single_file: false, ..Default::default() });
-    for tanstack_query in [false, true] {
+    for query in [QueryAdapter::None, QueryAdapter::React, QueryAdapter::Vue] {
         for single_file in [false, true] {
             for archive in [false, true] {
-                let options = OutputOptions { single_file, archive, tanstack_query };
+                let options = OutputOptions { single_file, archive, query };
                 let name = if archive {
-                    format!("sdk-{single_file}-{tanstack_query}.zip")
+                    format!("sdk-{single_file}-{query:?}.zip")
                 } else if single_file {
                     "client.js".into()
                 } else {
                     "sdk".into()
                 };
-                let parent = fixture.directory.join(format!("query-{tanstack_query}"));
+                let parent = fixture.directory.join(format!("query-{query:?}"));
                 std::fs::create_dir_all(&parent).unwrap();
                 let destination = parent.join(name);
                 let generated = fixture.write(&destination, options, false).unwrap();
@@ -73,7 +73,8 @@ fn the_default_is_a_directory_and_the_two_output_flags_are_independent() {
                     .filter(|(path, _)| path.extension().unwrap() == "js")
                     .map(|(_, source)| source.as_str())
                     .collect();
-                assert_eq!(javascript.contains("queryOptions(params"), tanstack_query);
+                assert_eq!(javascript.contains("queryOptions(params"), query.is_enabled());
+                assert_eq!(javascript.contains("withVueQueryOptions"), query == QueryAdapter::Vue);
                 assert!(javascript.contains("@param"));
                 if archive {
                     let mut files = read_zip(&destination);

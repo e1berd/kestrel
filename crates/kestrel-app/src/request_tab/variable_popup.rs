@@ -3,8 +3,10 @@ use gpui::{
     AnyElement, AppContext as _, Context, Entity, FontWeight, InteractiveElement as _, IntoElement, KeyDownEvent, ParentElement as _,
     Pixels, Point, Styled as _, Subscription, Window, anchored, deferred, div, rems,
 };
-use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::button::{Button, ButtonVariants as _, DropdownButton};
 use gpui_component::input::{Input, InputEvent, InputState};
+use gpui_component::menu::PopupMenuItem;
+use gpui_component::notification::Notification;
 use gpui_component::{Sizable as _, WindowExt as _, h_flex, v_flex};
 use kestrel_core::format::KeyValue;
 use kestrel_core::vars::Origin;
@@ -12,8 +14,9 @@ use kestrel_core::{Plan, VariableHome};
 
 use super::RequestTab;
 use super::variable_marks::VariableState;
+use super::variable_saving::SaveMode;
 use crate::appearance::{self, MONO_FONT, dp};
-use crate::ui::{chip, hint};
+use crate::ui::{ReportUnlessGone as _, chip, hint};
 
 pub(super) struct VariablePopup {
     name: String,
@@ -32,7 +35,7 @@ impl RequestTab {
         let scope = match Plan::with_file(&project.collection, &self.path, file, project.env.as_deref()) {
             Ok(plan) => plan.scope(&project.session),
             Err(error) => {
-                window.push_notification(gpui_component::notification::Notification::error(format!("{error:#}")), cx);
+                window.push_notification(Notification::error(format!("{error:#}")), cx);
                 return;
             }
         };
@@ -47,7 +50,7 @@ impl RequestTab {
         input.update(cx, |input, cx| input.focus(window, cx));
         let subscription = cx.subscribe_in(&input, window, |tab, _, event: &InputEvent, window, cx| {
             if matches!(event, InputEvent::PressEnter { .. }) {
-                tab.save_variable(window, cx);
+                tab.save_variable(SaveMode::Auto, window, cx);
             }
         });
         self.variable_popup = Some(VariablePopup { name, anchor, state, origin, editable, input, _subscription: subscription });
@@ -92,17 +95,81 @@ impl RequestTab {
         }
     }
 
-    fn save_variable(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn save_variable(&mut self, mode: SaveMode, window: &mut Window, cx: &mut Context<Self>) {
         let Some(popup) = self.variable_popup.take() else { return };
         if popup.editable {
             let value = popup.input.read(cx).value().to_string();
-            let mut items = self.vars.read(cx).items(cx);
-            set_in(&mut items, &popup.name, &value);
-            self.vars.update(cx, |table, cx| table.set_items(&items, window, cx));
-            self.track_pending_variable(popup.name);
-            self.changed(cx);
+            self.apply_variable(&popup.name, &value, mode, window, cx);
         }
         cx.notify();
+    }
+
+    fn apply_variable(&mut self, name: &str, value: &str, mode: SaveMode, window: &mut Window, cx: &mut Context<Self>) {
+        let mut items = self.vars.read(cx).items(cx);
+        match mode {
+            SaveMode::Environment => {
+                let Some(environment) = self.project.read(cx).env.clone() else {
+                    window.push_notification(Notification::error("Select an environment first."), cx);
+                    return;
+                };
+                let home = VariableHome::Environment(environment.clone());
+                let saved = self.project.update(cx, |project, cx| {
+                    let result = project.collection.set_variable(&home, name, value);
+                    cx.notify();
+                    result
+                });
+                if let Err(error) = saved {
+                    window.push_notification(Notification::error(format!("Could not save {name}: {error:#}")), cx);
+                    return;
+                }
+                self.pending_variables.retain(|pending| pending != name);
+                if items.iter().any(|item| item.name == name) {
+                    items.retain(|item| item.name != name);
+                    self.vars.update(cx, |table, cx| table.set_items(&items, window, cx));
+                    self.changed(cx);
+                }
+                window.push_notification(Notification::success(format!("Saved {name} in the environment {environment}.")), cx);
+            }
+            SaveMode::Auto | SaveMode::RequestOnly => {
+                set_in(&mut items, name, value);
+                self.vars.update(cx, |table, cx| table.set_items(&items, window, cx));
+                if mode == SaveMode::Auto {
+                    self.track_pending_variable(name.to_string());
+                } else {
+                    self.pending_variables.retain(|pending| pending != name);
+                }
+                self.changed(cx);
+            }
+        }
+    }
+
+    fn render_variable_save_button(&self, popup: &VariablePopup, cx: &mut Context<Self>) -> impl IntoElement {
+        let tab = cx.entity().downgrade();
+        let name = popup.name.clone();
+        let input = popup.input.clone();
+        DropdownButton::new("variable-save")
+            .small()
+            .primary()
+            .button(
+                Button::new("variable-save-main")
+                    .label("Save")
+                    .on_click(cx.listener(|tab, _, window, cx| tab.save_variable(SaveMode::Auto, window, cx))),
+            )
+            .dropdown_menu(move |menu, _, _| {
+                let modes = [("Save to the environment", SaveMode::Environment), ("Save to this request only", SaveMode::RequestOnly)];
+                modes.into_iter().fold(menu, |menu, (label, mode)| {
+                    let (tab, name, input) = (tab.clone(), name.clone(), input.clone());
+                    menu.item(PopupMenuItem::new(label).on_click(move |_, window, cx| {
+                        let value = input.read(cx).value().to_string();
+                        tab.update(cx, |tab, cx| {
+                            tab.variable_popup = None;
+                            tab.apply_variable(&name, &value, mode, window, cx);
+                            cx.notify();
+                        })
+                        .report_unless_gone("save a variable");
+                    }))
+                })
+            })
     }
 
     fn close_variable_popup(&mut self, cx: &mut Context<Self>) {
@@ -152,13 +219,7 @@ impl RequestTab {
                                 .label("Cancel")
                                 .on_click(cx.listener(|tab, _, _, cx| tab.close_variable_popup(cx))),
                         )
-                        .child(
-                            Button::new("variable-save")
-                                .small()
-                                .primary()
-                                .label("Save")
-                                .on_click(cx.listener(|tab, _, window, cx| tab.save_variable(window, cx))),
-                        ),
+                        .child(self.render_variable_save_button(popup, cx)),
                 )
             });
         Some(deferred(anchored().position(popup.anchor).snap_to_window_with_margin(dp(8.)).child(card)).with_priority(1).into_any_element())

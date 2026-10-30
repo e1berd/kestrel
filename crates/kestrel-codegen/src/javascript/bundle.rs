@@ -4,25 +4,43 @@ use std::path::Path;
 use anyhow::Result;
 use kestrel_core::transfer::Progress;
 
-use crate::Resource;
+use crate::{QueryAdapter, Resource};
 
+use super::query::{self, Typings};
 use super::{Files, insert};
 
 pub(super) fn generate(
     root: &Resource,
     services: &BTreeMap<String, String>,
     plugins: &[(&str, &str, &str)],
-    tanstack_query: bool,
+    query: QueryAdapter,
     progress: &Progress,
 ) -> Result<(Files, Vec<String>)> {
     let mut javascript = String::new();
     let mut declarations = String::new();
-    let templates = super::runtime::files(tanstack_query);
-    for name in ["web", "runtime", "routing", "auth", "cookies", "hooks", "executor", "collection", "tanstack"] {
+    let mut packages = BTreeSet::new();
+    let mut package_types = BTreeSet::new();
+    let templates = super::runtime::files(query);
+    for name in [
+        "web",
+        "runtime",
+        "routing",
+        "auth",
+        "cookies",
+        "hooks",
+        "events",
+        "executor",
+        "collection",
+        "callable",
+        "tanstack",
+        "tanstack-vue",
+    ] {
         let path = format!("lib/{name}.js");
         if let Some(source) = templates.get(Path::new(&path)) {
+            packages.extend(package_imports(source));
             javascript.push_str(&without_imports(source).replace(&format!("./{name}.js"), "./client.js"));
             let types = Path::new(&path).with_extension("d.ts");
+            package_types.extend(package_imports(&templates[&types]));
             declarations.push_str(&without_imports(&templates[&types]));
         }
     }
@@ -54,13 +72,22 @@ pub(super) fn generate(
     let mut names = BTreeMap::new();
     super::register(root, &[], &mut names, &mut BTreeSet::new());
     let mut methods = Vec::new();
-    Renderer { names: &names, javascript: &mut javascript, declarations: &mut declarations, methods: &mut methods, tanstack_query }
-        .render(root, &[], progress)?;
+    Renderer { names: &names, javascript: &mut javascript, declarations: &mut declarations, methods: &mut methods, query }.render(
+        root,
+        &[],
+        progress,
+    )?;
     javascript.push_str("\n/** @param {import('./client.js').ClientOptions} [options] */\nexport function createClient(options = {}) {\n  return new Client(options);\n}\n");
     declarations.push_str("export declare function createClient(options?: ClientOptions): Client;\n");
     let mut files = Files::new();
+    let javascript = format!("{}{javascript}", packages.into_iter().map(|line| format!("{line}\n")).collect::<String>());
+    let declarations = format!("{}{declarations}", package_types.into_iter().map(|line| format!("{line}\n")).collect::<String>());
     insert(&mut files, Path::new("client.js"), javascript, declarations);
     Ok((files, methods))
+}
+
+fn package_imports(source: &str) -> impl Iterator<Item = String> + '_ {
+    source.lines().filter(|line| line.starts_with("import ") && !line.contains("from '.") && !line.contains("from \".")).map(str::to_string)
 }
 
 fn without_imports(source: &str) -> String {
@@ -88,7 +115,7 @@ struct Renderer<'a> {
     javascript: &'a mut String,
     declarations: &'a mut String,
     methods: &'a mut Vec<String>,
-    tanstack_query: bool,
+    query: QueryAdapter,
 }
 
 impl Renderer<'_> {
@@ -99,8 +126,9 @@ impl Renderer<'_> {
             self.render(child, &child_path, progress)?;
         }
         progress.check()?;
-        let Self { names, javascript, declarations, methods, tanstack_query } = self;
-        let tanstack_query = *tanstack_query;
+        let Self { names, javascript, declarations, methods, query } = self;
+        let query = *query;
+        let typings = Typings::bundled(query);
         let class = &names[path];
         javascript.push_str(&format!("\nexport class {class} extends Resource {{\n"));
         let mut class_types = format!("\nexport declare class {class} extends Resource {{\n");
@@ -118,26 +146,19 @@ impl Renderer<'_> {
         for (name, operation) in &root.methods {
             progress.check()?;
             let callable = format!("Operation{}", methods.len());
-            declarations.push_str(&super::operation::callable(operation, &callable, "Operation", tanstack_query.then_some(""))?);
+            declarations.push_str(&super::operation::callable(operation, &callable, "Operation", &typings)?);
             class_types.push_str(&format!("  readonly {name}: {callable};\n"));
-            let default = if operation.path_parameters.is_empty() && operation.body.is_none() { " = {}" } else { "" };
             let descriptor = format!("operations[{}]", serde_json::to_string(&operation.transport.id)?);
-            let invoke = if let Some(collection) = &operation.collection {
-                format!("createCollection(this[resourceExecutor], {descriptor}, params, options, {})", serde_json::to_string(collection)?)
-            } else {
-                format!("this[resourceExecutor]({descriptor}, params, options)")
+            let collection = match &operation.collection {
+                Some(collection) => serde_json::to_string(collection)?,
+                None => "null".into(),
             };
-            javascript.push_str(&format!("  /** @type {{import('./client.js').{class}['{name}']}} */\n  {name} = "));
-            if tanstack_query {
-                javascript.push_str("withQueryOptions(");
-            }
-            javascript.push_str(&format!(
-            "Object.assign((params{default}, options = {{}}) =>\n    {invoke}, {{\n    operation: {descriptor},\n    request: (params{default}, options = {{}}) => this[resourceExecutor].request({descriptor}, params, options),\n    response: (params{default}, options = {{}}) => this[resourceExecutor].response({descriptor}, params, options),\n  }})"
-        ));
-            if tanstack_query {
-                javascript.push_str(", this[resourceExecutor])");
-            }
-            javascript.push_str(";\n");
+            let creation = format!("createCallable(this[resourceExecutor], {descriptor}, {collection})");
+            let creation = match query::wrapper(query) {
+                Some((symbol, _)) => format!("{symbol}({creation}, this[resourceExecutor])"),
+                None => creation,
+            };
+            javascript.push_str(&format!("  /** @type {{import('./client.js').{class}['{name}']}} */\n  {name} = {creation};\n"));
             methods.push(operation.transport.id.clone());
         }
         javascript.push_str("}\n");

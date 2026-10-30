@@ -149,7 +149,10 @@ fn query_method_keeps_its_body_and_url_parameters_separate() {
         let original = std::fs::read(&path).unwrap();
         let generated = fixture.generated();
         assert_eq!(generated.methods, ["users.list", "users.query"]);
-        assert!(source(&generated).contains("<Result = unknown>(params: { query?:"));
+        assert!(
+            source(&generated).contains("<Result = unknown>(params: CallableParams, options?: RequestOptions)")
+                || source(&generated).contains("Params = { query?:")
+        );
         assert!(source(&generated).contains("\"limit\"?: QueryValue; \"offset\"?: QueryValue }; body: JsonValue"));
         assert!(source(&generated).contains("\"method\":\"QUERY\""));
         assert!(source(&generated).contains("[\"limit\",\"10\"],[\"offset\",\"0\"]"));

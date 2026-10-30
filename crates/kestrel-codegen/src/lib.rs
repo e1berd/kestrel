@@ -25,10 +25,24 @@ pub use security::Authentication;
 pub use writing::generate_to;
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum QueryAdapter {
+    #[default]
+    None,
+    React,
+    Vue,
+}
+
+impl QueryAdapter {
+    pub fn is_enabled(self) -> bool {
+        self != Self::None
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct OutputOptions {
     pub single_file: bool,
     pub archive: bool,
-    pub tanstack_query: bool,
+    pub query: QueryAdapter,
 }
 
 #[derive(Debug, Clone)]

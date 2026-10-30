@@ -2,6 +2,7 @@ mod aggregate;
 mod bundle;
 mod modules;
 mod operation;
+mod query;
 mod runtime;
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,9 +23,9 @@ pub(crate) fn generate(
     progress: &Progress,
 ) -> Result<(Files, Vec<String>)> {
     if options.single_file {
-        return bundle::generate(root, services, plugins, options.tanstack_query, progress);
+        return bundle::generate(root, services, plugins, options.query, progress);
     }
-    let (files, methods) = modules::generate(root, services, plugins, options.tanstack_query, progress)?;
+    let (files, methods) = modules::generate(root, services, plugins, options.query, progress)?;
     Ok((files, methods))
 }
 

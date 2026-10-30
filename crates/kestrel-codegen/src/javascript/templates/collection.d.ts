@@ -1,4 +1,5 @@
 import type { Parameters, Operation, RequestOptions } from './web.js';
+import type { RequestFilter, RequestSelector } from './events.js';
 import type { createExecutor } from './executor.js';
 export interface Page<Item> {
     readonly items: readonly Item[];
@@ -25,4 +26,5 @@ export declare const resourceExecutor: unique symbol;
 export declare abstract class Resource {
     protected readonly [resourceExecutor]: Executor;
     constructor(execute: Executor);
+    requestFilter(selector?: RequestSelector | string): RequestFilter;
 }

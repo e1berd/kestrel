@@ -1,13 +1,6 @@
 import { toSearchParams } from "./routing.js";
 
-const queryScopes = new WeakMap();
-
-function queryScope(execute) {
-  if (!queryScopes.has(execute)) queryScopes.set(execute, globalThis.crypto.randomUUID());
-  return queryScopes.get(execute);
-}
-
-function queryValue(value, ancestors = new Set()) {
+export function queryValue(value, ancestors = new Set()) {
   if (value === undefined || value === null || typeof value === 'string' || typeof value === 'boolean') return value;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value !== 'object' || ancestors.has(value)) throw new TypeError('Query parameters must be finite JSON values');
@@ -24,7 +17,7 @@ function queryValue(value, ancestors = new Set()) {
   return result;
 }
 
-async function queryResult(result) {
+export async function queryResult(result) {
   if (result && typeof result[Symbol.asyncIterator] === 'function') {
     const items = [];
     for await (const item of result) items.push(item);
@@ -33,18 +26,35 @@ async function queryResult(result) {
   return await result;
 }
 
+export function operationKey(execute, operation) {
+  return ['kestrel', execute.queryScope(operation.service), ...operation.id.split('.')];
+}
+
+export function requestSettings(options) {
+  const { signal, ...request } = options;
+  return { signal, settings: { ...request, headers: Array.from(new Headers(request.headers).entries()) } };
+}
+
+export function snapshotParams(params) {
+  return queryValue({ ...params, search: params.search === undefined ? undefined : toSearchParams(params.search) });
+}
+
 /** @type {typeof import('./tanstack.js').withQueryOptions} */
 export function withQueryOptions(call, execute) {
-  const { service, id, method } = call.operation;
-  const scope = queryScope(execute);
-  if (['GET', 'HEAD', 'QUERY'].includes(method)) {
+  const { operation } = call;
+  if (['GET', 'HEAD', 'QUERY'].includes(operation.method)) {
+    const queryKey = (params, options = {}) => {
+      const prefix = operationKey(execute, operation);
+      if (params === undefined) return prefix;
+      return [...prefix, snapshotParams(params), queryValue(requestSettings(options).settings)];
+    };
     return Object.assign(call, {
+      queryKey,
       queryOptions(params = {}, options = {}) {
-        const snapshot = queryValue({ ...params, search: params.search === undefined ? undefined : toSearchParams(params.search) });
-        const { signal, ...request } = options;
-        const settings = { ...request, headers: Array.from(new Headers(request.headers).entries()) };
+        const snapshot = snapshotParams(params);
+        const { signal, settings } = requestSettings(options);
         return {
-          queryKey: ['kestrel', scope, service, id, snapshot, queryValue(settings)],
+          queryKey: queryKey(snapshot, options),
           queryFn: ({ signal: querySignal }) => queryResult(call(snapshot, {
             ...settings,
             signal: signal ? AbortSignal.any([signal, querySignal]) : querySignal,
@@ -56,7 +66,7 @@ export function withQueryOptions(call, execute) {
   return Object.assign(call, {
     mutationOptions(options = {}) {
       return {
-        mutationKey: ['kestrel', scope, service, id],
+        mutationKey: operationKey(execute, operation),
         mutationFn: (params) => queryResult(call(params, options)),
       };
     },

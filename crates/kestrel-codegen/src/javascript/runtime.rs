@@ -1,8 +1,10 @@
 use std::path::Path;
 
+use crate::QueryAdapter;
+
 use super::{Files, insert};
 
-pub(super) fn files(tanstack_query: bool) -> Files {
+pub(super) fn files(query: QueryAdapter) -> Files {
     let mut files = Files::new();
     macro_rules! template {
         ($name:literal) => {
@@ -20,10 +22,15 @@ pub(super) fn files(tanstack_query: bool) -> Files {
     template!("auth");
     template!("cookies");
     template!("hooks");
+    template!("events");
     template!("executor");
     template!("collection");
-    if tanstack_query {
+    template!("callable");
+    if query.is_enabled() {
         template!("tanstack");
+    }
+    if query == QueryAdapter::Vue {
+        template!("tanstack-vue");
     }
     files
 }

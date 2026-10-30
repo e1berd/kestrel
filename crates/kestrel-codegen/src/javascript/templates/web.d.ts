@@ -34,6 +34,7 @@ export interface ServiceOptions {
 }
 export interface ClientOptions extends ServiceOptions {
     defaultService?: ServiceName;
+    queryScope?: string;
     services?: Partial<Record<ServiceName, ServiceOptions>>;
     fetch?: typeof globalThis.fetch;
 }

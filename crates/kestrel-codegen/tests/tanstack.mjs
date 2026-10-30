@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
 
 export async function verifyTanStack({ createClient }) {
+  if (process.env.KESTREL_QUERY_ADAPTER === 'vue') return (await import('./vue.mjs')).verifyVue({ createClient });
   const calls = [];
   const client = createClient({
     baseUrl: 'https://example.com', token: 'token', variables: { scope: 'test' },
