@@ -14,7 +14,7 @@ Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the Open
 - **Scripts and tests**: before-request and after-response scripts and `test()` / `expect()` with Bruno's API (`bru`, `req`, `res`) in QuickJS, `require('jsonwebtoken')` included.
 - **Imports**: OpenAPI 3.0 / 3.1 / 3.2 and Swagger 2.0 in JSON or YAML, and native Apidog JSON exports. Preview requests, folders and conversion warnings before choosing an empty destination folder.
 - **Exports**: OpenAPI 3.0 / 3.1 / 3.2, Swagger 2.0 and Apidog, with streaming file handling and actual stage progress in both transfer dialogs.
-- **SDK generation**: standalone TypeScript clients with resource classes and async iterable collections: `Array.fromAsync(client.users.list())`, `.insert()`, `.update()` and `.delete()`, directly from saved requests.
+- **SDK generation**: standalone TypeScript clients with resource classes and async iterable collections: `Array.fromAsync(client.users.list())`, `.insert()`, `.update()` and `.delete()`, directly from saved requests. Optional data layers: TanStack Query (React or Vue) and rstore.
 - **OpenAPI sync**: sync an imported collection as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
 - **Several projects open at once**, each with its own tabs; switch from the rail on the left or with Ctrl+Shift+[ / ].
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
@@ -173,13 +173,19 @@ Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apido
 kestrelcli sync path/to/collection
 ```
 
-Choose **Generate SDK…** from the collection menu or command palette, or run:
+## Code generation
 
-```bash
-kestrelcli codegen path/to/collection --out sdk
-```
+Generate a JavaScript SDK from saved requests, optionally with TanStack Query (React or Vue) or rstore. Documentation: [docs/codegen](docs/codegen/README.md).
 
-The generated TypeScript SDK uses fetch without runtime dependencies. By default it writes a module directory with resource classes and lazy `Collection<T>` async iterables. Use `--single-file` to bundle it, `--archive` to package it as ZIP, or both; both options default to off and are also available in the desktop dialog. It supports nested resources, pagination, request bodies and inherited authentication, with credentials and variables supplied at runtime. Use `--overwrite` to replace a generated SDK. See the [SDK guide](crates/kestrel-codegen/README.md) for layouts, API examples, authentication and limitations.
+- [Overview, options and data layers](docs/codegen/README.md)
+- [Plain SDK](docs/codegen/plain-sdk.md): generated code and usage
+- [Observing requests](docs/codegen/events.md): `client.observe().filter(...)` and global listeners
+- [TanStack Query](docs/codegen/tanstack-query.md): React and Vue
+- [rstore](docs/codegen/rstore.md)
+- [Resources, methods and collections](docs/codegen/resources-and-collections.md)
+- [Variables, authentication and bodies](docs/codegen/configuration.md)
+- [Native Web APIs and services](docs/codegen/web-apis.md), [transport](docs/codegen/transport.md), [plugins](docs/codegen/plugins.md)
+- [Output layout](docs/codegen/layout.md) and [validation](docs/codegen/testing.md)
 
 ## MCP
 

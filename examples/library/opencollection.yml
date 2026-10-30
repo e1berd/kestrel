@@ -1,0 +1,9 @@
+opencollection: 1.0.0
+
+info:
+  name: Library
+
+request:
+  variables:
+    - name: baseUrl
+      value: https://api.example.com

@@ -1,0 +1,13 @@
+info:
+  name: Update user
+  type: http
+  seq: 4
+
+http:
+  method: PATCH
+  url: "{{baseUrl}}/v1/users/:user_id"
+  body:
+    type: json
+    data: |-
+      {}
+  auth: inherit

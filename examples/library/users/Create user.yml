@@ -1,0 +1,13 @@
+info:
+  name: Create user
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{baseUrl}}/v1/users"
+  body:
+    type: json
+    data: |-
+      {}
+  auth: inherit

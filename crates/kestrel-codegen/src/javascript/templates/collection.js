@@ -91,8 +91,8 @@ export class Resource {
   constructor(execute) {
     this[resourceExecutor] = execute;
   }
-  /** @type {import("./collection.js").Resource['requestFilter']} */
-  requestFilter(selector) {
-    return this[resourceExecutor].events.filter(selector);
+  /** @type {import("./collection.js").Resource['observe']} */
+  observe() {
+    return this[resourceExecutor].events.observe();
   }
 }

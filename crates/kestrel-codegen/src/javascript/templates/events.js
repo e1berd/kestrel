@@ -10,6 +10,18 @@ export class RequestEvent extends Event {
     super(type);
     Object.assign(this, detail);
   }
+  get ok() {
+    return this.response?.ok === true;
+  }
+  get status() {
+    return this.response?.status;
+  }
+  get method() {
+    return this.operation.method;
+  }
+  get url() {
+    return new URL(this.request.url);
+  }
 }
 const escapePattern = (text) => text.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
 function compileGlob(pattern, separator) {
@@ -85,13 +97,17 @@ export function compileSelector(selector) {
   });
   return (event) => conditions.every((condition) => condition(event));
 }
-export class RequestFilter {
+export class RequestStream {
   #bus;
   #matches;
   #wrappers = new WeakMap();
   constructor(bus, matches) {
     this.#bus = bus;
     this.#matches = matches;
+  }
+  filter(condition) {
+    const test = typeof condition === "function" ? condition : compileSelector(condition);
+    return new RequestStream(this.#bus, (event) => this.#matches(event) && test(event));
   }
   addEventListener(type, listener, options) {
     const wrappers = this.#wrappers.get(listener) ?? new Map();
@@ -123,6 +139,6 @@ export function createEvents() {
   const bus = new EventTarget();
   return Object.freeze({
     emit: (type, detail) => bus.dispatchEvent(new RequestEvent(type, detail)),
-    filter: (selector = {}) => new RequestFilter(bus, compileSelector(selector)),
+    observe: () => new RequestStream(bus, () => true),
   });
 }

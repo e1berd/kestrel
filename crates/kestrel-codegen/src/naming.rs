@@ -29,7 +29,7 @@ pub(crate) fn validate(name: &str) -> Result<()> {
         || !name.chars().enumerate().all(|(index, character)| {
             character.is_ascii_alphabetic() || character == '_' || character == '$' || (index > 0 && character.is_ascii_digit())
         })
-        || matches!(name, "__proto__" | "prototype" | "constructor" | "then" | "requestFilter")
+        || matches!(name, "__proto__" | "prototype" | "constructor" | "then" | "observe")
     {
         bail!("`{name}` is not a safe SDK identifier; choose an explicit resource or method name in extensions.kestrel.codegen");
     }
