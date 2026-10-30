@@ -21,17 +21,118 @@ Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the Open
 
 ## Build
 
-Rust stable (see `rust-toolchain.toml`). On Linux GPUI needs Vulkan, X11/Wayland, xkbcommon and fontconfig.
+Run these commands from the repository root. Use Rust stable (see `rust-toolchain.toml`). To build the app, CLI and MCP server without packaging:
+
+```bash
+cargo build --release --locked --workspace
+```
+
+The executables are `target/release/kestrel`, `target/release/kestrelcli` and `target/release/kestrel-mcp`. To build and start the app:
 
 ```bash
 cargo run --release
 ```
 
-On Linux, `packaging/linux/install.sh` builds a release, puts `kestrel`, `kestrelcli` and `kestrel-mcp` in `~/.local/bin` and adds the app with its icon to the application menu.
+`cargo run` reopens the collections that were open last time; on the first launch it shows a welcome screen. `cargo cli …` runs `kestrelcli` (for example `cargo cli run examples/httpbin --env public`). The Rust package remains `kestrel-cli`; its executable is named `kestrelcli`.
 
-To build `.deb` and `.AppImage` packages for Linux or Apple Silicon, Intel and universal `.dmg` images in a macOS VM, see the [packaging guide](packaging/README.md).
+### Linux: Ubuntu, Debian and Arch-based distributions
 
-`cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrelcli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds all three executables into `target/release/`. The Rust package remains `kestrel-cli`; its executable is named `kestrelcli`.
+On an **x86_64 Linux host with Docker**, build both `.deb` and `.AppImage`:
+
+```bash
+bash packaging/linux/container.sh
+```
+
+The script installs the build dependencies and Rust stable inside an Ubuntu 22.04 container. Its glibc 2.35 baseline lets the packages run on older distributions than the build host. The host does not need the native development libraries for this command.
+
+| Target system | Output in `dist/` |
+| --- | --- |
+| Ubuntu 22.04+ / Debian 12+, amd64 | `kestrel_<version>_amd64.deb` |
+| Arch, EndeavourOS, Manjaro and other x86_64 Linux systems with glibc 2.35+ | `Kestrel-<version>-x86_64.AppImage` |
+
+To build only one format:
+
+```bash
+bash packaging/linux/container.sh deb
+bash packaging/linux/container.sh appimage
+```
+
+Check package installation and CLI/MCP startup in clean Ubuntu, Debian and Arch containers:
+
+```bash
+bash packaging/linux/verify.sh
+```
+
+For a native build without Docker, install the dependencies listed in the [Linux builder Dockerfile](packaging/linux/Dockerfile), then run:
+
+```bash
+bash packaging/linux/build.sh
+```
+
+Native builds use the host's glibc; use the container for distributable releases. For development, the `cargo build` / `cargo run` commands above need the native libraries too. GPUI uses Vulkan, X11/Wayland, xkbcommon and fontconfig; a working Vulkan driver is required to run the GUI. On Arch, install `libxcb`, `libxkbcommon`, `libxkbcommon-x11`, `wayland`, `vulkan-icd-loader`, `ca-certificates` and the Vulkan driver for your GPU.
+
+To build and install locally without producing packages:
+
+```bash
+bash packaging/linux/install.sh
+```
+
+This installs the three executables into `~/.local/bin` and adds the application icon and menu entry.
+
+### macOS: Apple Silicon and Intel
+
+The macOS builder supports these architecture selections through `KESTREL_MACOS_ARCH`:
+
+| Value | Target | Output in `dist/` |
+| --- | --- | --- |
+| `aarch64` | Apple Silicon, native ARM64 | `Kestrel-<version>-aarch64.dmg` |
+| `x86_64` | Intel | `Kestrel-<version>-x86_64.dmg` |
+| `universal` | Apple Silicon + Intel in one app | `Kestrel-<version>-universal.dmg` |
+| `all` (default) | All three packages; Apple Silicon compiles first | All three `.dmg` files |
+
+#### Build from Linux using the macOS VM
+
+The guest needs Apple's Command Line Tools, Python 3, Rust stable installed through rustup and SSH key access. To build **only Apple Silicon**:
+
+```bash
+KESTREL_MACOS_ARCH=aarch64 bash packaging/macos/vm.sh
+```
+
+For Intel, universal or all three packages:
+
+```bash
+KESTREL_MACOS_ARCH=x86_64 bash packaging/macos/vm.sh
+KESTREL_MACOS_ARCH=universal bash packaging/macos/vm.sh
+bash packaging/macos/vm.sh
+```
+
+Defaults match the existing OSX-KVM guest: VM directory `$HOME/vms/macos/OSX-KVM`, SSH `zift@127.0.0.1:2223`. Override them with `KESTREL_MACOS_VM_DIR`, `KESTREL_MACOS_SSH` and `KESTREL_MACOS_SSH_PORT`. The script connects to the VM or starts it through its existing `start.sh`, transfers sources, builds inside macOS and copies the packages back to the Linux host's `dist/`. If OpenCore stops at its boot picker, boot the installed macOS from the VM console before retrying.
+
+An Intel macOS guest can compile native Apple Silicon binaries. Running the ARM64 app requires an Apple Silicon Mac; testing the GUI also requires a Metal-capable GPU, which the current VM's emulated display does not provide.
+
+#### Build directly on a Mac
+
+Install Rust stable through rustup, Python 3 and Apple's Command Line Tools (`xcode-select --install`). Full Xcode is not required: the app compiles Metal shaders at runtime. For Apple Silicon:
+
+```bash
+KESTREL_MACOS_ARCH=aarch64 bash packaging/macos/build.sh
+```
+
+For Intel, universal or all three packages:
+
+```bash
+KESTREL_MACOS_ARCH=x86_64 bash packaging/macos/build.sh
+KESTREL_MACOS_ARCH=universal bash packaging/macos/build.sh
+bash packaging/macos/build.sh
+```
+
+Each DMG contains `Kestrel.app` and an Applications shortcut. The CLI and MCP executables are inside `Kestrel.app/Contents/MacOS/`. Builds use ad-hoc signatures by default; Developer ID signing and notarization are described in the [packaging guide](packaging/README.md#macos-vm).
+
+### Build outputs and CI
+
+All packages contain the app, CLI and MCP server. Package versions come from `Cargo.toml`; every artifact has a matching `.sha256` file. Override the output directory with `KESTREL_DIST_DIR` and parallel compilation with `CARGO_BUILD_JOBS` (packaging defaults to 2). Linux container caches are in `target/packaging/`; the macOS VM keeps its Rust build cache in `~/kestrel-build/target`.
+
+The [Packages workflow](.github/workflows/packages.yml) runs on `v*` tags or manual dispatch and uploads the built packages as workflow artifacts. Linux uses Docker; macOS requires a self-hosted runner registered inside the guest with the `macOS` and `kestrel` labels. See the [packaging guide](packaging/README.md) for installation commands, signing options and VM setup details.
 
 ## Use
 
