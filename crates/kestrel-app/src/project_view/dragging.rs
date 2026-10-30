@@ -5,7 +5,7 @@ use gpui::{
     AppContext as _, Context, Div, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Window, div,
     relative, rems,
 };
-use gpui_component::{Icon, h_flex, v_flex};
+use gpui_component::{Icon, h_flex};
 use gpui_kit_assets::IconName;
 use kestrel_core::Collection;
 use kestrel_core::collection_move::MoveTarget;
@@ -52,14 +52,39 @@ impl ProjectView {
             .child(eyebrow("Requests", cx))
     }
 
-    pub(super) fn render_drop_zones(&self, path: &Path, is_folder: bool, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn render_drop_zones(&self, path: &Path, name: &str, is_folder: bool, cx: &mut Context<Self>) -> impl IntoElement {
         let path = path.to_path_buf();
-        v_flex()
+        let edge = if is_folder { 0.15 } else { 0.5 };
+        let palette = appearance::palette(cx);
+        div()
             .absolute()
             .inset_0()
-            .child(self.render_drop_zone(MoveTarget::Before(path.clone()), cx).h(relative(if is_folder { 0.25 } else { 0.5 })))
-            .when(is_folder, |element| element.child(self.render_drop_zone(MoveTarget::Inside(path.clone()), cx).h(relative(0.5))))
-            .child(self.render_drop_zone(MoveTarget::After(path), cx).h(relative(if is_folder { 0.25 } else { 0.5 })))
+            .child(self.render_drop_zone(MoveTarget::Before(path.clone()), cx).absolute().top_0().h(relative(edge)))
+            .when(is_folder, |element| {
+                let hovered = path.clone();
+                element.child(
+                    self.render_drop_zone(MoveTarget::Inside(path.clone()), cx)
+                        .absolute()
+                        .top(relative(edge))
+                        .h(relative(1. - 2. * edge))
+                        .rounded(dp(4.))
+                        .flex()
+                        .items_center()
+                        .px(dp(8.))
+                        .gap(dp(4.))
+                        .text_xs()
+                        .text_color(palette.accent)
+                        .opacity(0.)
+                        .drag_over::<TreeDrag>(|style, _, _, _| style.opacity(1.))
+                        .child(div().flex_1().min_w_0().truncate().child(name.to_owned()))
+                        .child(Icon::new(IconName::FolderInput).size(dp(12.)))
+                        .child("Move inside")
+                        .on_drag_move(cx.listener(move |view, event: &gpui::DragMoveEvent<TreeDrag>, window, cx| {
+                            view.hover_tree_folder(&hovered, event, window, cx);
+                        })),
+                )
+            })
+            .child(self.render_drop_zone(MoveTarget::After(path), cx).absolute().bottom_0().h(relative(edge)))
     }
 
     pub(super) fn render_root_drop_zone(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -103,6 +128,7 @@ impl ProjectView {
     }
 
     fn move_tree_item(&mut self, path: PathBuf, target: MoveTarget, window: &mut Window, cx: &mut Context<Self>) {
+        self.tree_hover = None;
         if self.project.read(cx).tree_move_pending {
             return;
         }

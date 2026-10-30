@@ -141,6 +141,7 @@ impl ProjectView {
             Some(method) => method_label(method, cx).into_any_element(),
         };
         let view = cx.entity().downgrade();
+        let drag_view = view.clone();
         let menu_path = path.clone();
         let drag = TreeDrag { root: self.root(cx), path: path.clone(), name: row.name.clone(), method: row.method.clone() };
         h_flex()
@@ -159,12 +160,17 @@ impl ProjectView {
             .when(is_active, |el| el.bg(active_background).font_weight(gpui::FontWeight::MEDIUM))
             .when(!is_active, |el| el.hover(|el| el.bg(palette.hover).text_color(palette.text)))
             .child(lead)
-            .child(div().flex_1().min_w_0().truncate().when(is_folder, |el| el.font_weight(gpui::FontWeight::MEDIUM)).child(row.name))
+            .child(
+                div().flex_1().min_w_0().truncate().when(is_folder, |el| el.font_weight(gpui::FontWeight::MEDIUM)).child(row.name.clone()),
+            )
             .when(is_folder && row.count > 0, |el| {
                 el.child(div().text_size(rems(0.72)).text_color(palette.faint).child(row.count.to_string()))
             })
-            .on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()))
-            .when(cx.has_active_drag(), |element| element.child(self.render_drop_zones(&row.path, is_folder, cx)))
+            .on_drag(drag, move |drag, _, _, cx| {
+                drag_view.update(cx, |view, _| view.tree_hover = None).report_unless_gone("start dragging a collection item");
+                cx.new(|_| drag.clone())
+            })
+            .when(cx.has_active_drag(), |element| element.child(self.render_drop_zones(&row.path, &row.name, is_folder, cx)))
             .on_click(cx.listener(move |view, _: &ClickEvent, window, cx| {
                 if is_folder {
                     view.toggle_folder(&path, cx);

@@ -92,6 +92,41 @@ fn folders_move_with_their_entire_subtree_and_can_return_to_the_root() {
 }
 
 #[test]
+fn folders_move_into_nested_nonempty_folders_and_persist_the_hierarchy() {
+    let mut fixture = Fixture::new();
+    let collection = &mut fixture.collection;
+    let root = collection.root.clone();
+    let source = collection.add_folder(&root, "Source").unwrap();
+    let child = collection.add_folder(&source, "Child").unwrap();
+    let original = request(collection, &child, "Nested");
+    let original_bytes = fs::read(&original).unwrap();
+    let parent = collection.add_folder(&root, "Parent").unwrap();
+    let target = collection.add_folder(&parent, "Target").unwrap();
+    let existing = collection.add_folder(&target, "Existing").unwrap();
+    let existing_request = request(collection, &target, "Keep");
+    let existing_bytes = fs::read(&existing_request).unwrap();
+
+    assert!(collection.can_move_item(&source, &MoveTarget::Inside(target.clone())));
+    let moved = collection.move_item(&source, &MoveTarget::Inside(target.clone())).unwrap();
+    assert_eq!(moved, target.join("Source"));
+
+    let reopened = Collection::open(&root).unwrap();
+    let Some(Item::Folder(folder)) = reopened.item(&target) else { panic!("the target remains a folder") };
+    assert_eq!(
+        folder.children.iter().map(Item::path).collect::<Vec<_>>(),
+        vec![existing.as_path(), moved.as_path(), existing_request.as_path()]
+    );
+    let nested = moved.join("Child/Nested.yml");
+    assert_eq!(
+        reopened.ancestors(&nested).iter().map(|folder| folder.dir.as_path()).collect::<Vec<_>>(),
+        vec![parent.as_path(), target.as_path(), moved.as_path(), moved.join("Child").as_path()]
+    );
+    assert_eq!(fs::read(nested).unwrap(), original_bytes);
+    assert_eq!(fs::read(existing_request).unwrap(), existing_bytes);
+    assert!(!source.exists());
+}
+
+#[test]
 fn requests_can_be_inserted_before_and_after_other_requests() {
     let mut fixture = Fixture::new();
     let collection = &mut fixture.collection;

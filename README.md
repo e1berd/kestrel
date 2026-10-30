@@ -4,6 +4,8 @@ A free, open-source API client that keeps your requests as plain files in git. B
 
 Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the OpenCollection YAML format) and writes them back byte for byte, so a save shows in `git diff` only where you changed something. Everything is free: no account, no cloud, no limits on OpenAPI imports.
 
+![Kestrel with a request collection, JSON body editor and response viewer](docs/images/kestrel-screenshot.webp)
+
 ## What it does
 
 - **File-based collections**: one YAML file per request, `folder.yml` per folder, `environments/*.yml`, secrets in `.env` (ignored by git).

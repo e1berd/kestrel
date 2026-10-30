@@ -6,6 +6,7 @@ mod sidebar_state;
 mod tab_dragging;
 mod tab_strip;
 mod tree_actions;
+mod tree_hover;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -39,6 +40,7 @@ pub struct ProjectView {
     tree_scroll: gpui::UniformListScrollHandle,
     sidebar: SidebarTree,
     filter_task: Option<Task<()>>,
+    tree_hover: Option<(PathBuf, Task<()>)>,
     filtering: bool,
     _subscriptions: Vec<Subscription>,
 }
@@ -73,6 +75,7 @@ impl ProjectView {
             tree_scroll: Default::default(),
             sidebar,
             filter_task: None,
+            tree_hover: None,
             filtering: false,
             _subscriptions: subscriptions,
         }
