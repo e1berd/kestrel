@@ -21,8 +21,9 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
         Command::Mcp { collection } => kestrel_mcp::serve(&collection).map(|_| true),
-        Command::Codegen { collection, out, language: _, single_file, archive, overwrite } => {
-            codegen::generate(&collection, &out, kestrel_codegen::OutputOptions { single_file, archive }, overwrite).map(|_| true)
+        Command::Codegen { collection, out, language: _, single_file, archive, tanstack_query, overwrite } => {
+            codegen::generate(&collection, &out, kestrel_codegen::OutputOptions { single_file, archive, tanstack_query }, overwrite)
+                .map(|_| true)
         }
         Command::Export { collection, out, format, encoding, overwrite } => {
             importing::export(&collection, &out, &format, &encoding, overwrite).map(|_| true)

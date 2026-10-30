@@ -12,7 +12,7 @@ pub(super) fn generate(collection: &Path, destination: &Path, options: kestrel_c
         eprintln!("{} {warning}", paint("warning:", YELLOW));
     }
     println!(
-        "Generated TypeScript SDK: {} methods, {} source files in {}",
+        "Generated JavaScript SDK: {} methods, {} source files in {}",
         generated.requests,
         generated.files.len(),
         destination.display()

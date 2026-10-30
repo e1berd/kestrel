@@ -1,4 +1,4 @@
-import { ApiError, Collection, Resource, createClient, type Client, type Page, type UsersResource, type UsersMessagesResource } from "./client.ts";
+import { ApiError, Collection, Resource, createClient, type Client, type Page, type UsersResource, type UsersMessagesResource } from "./client.js";
 
 const client: Client = createClient({
   baseUrl: "https://example.com/api",

@@ -2,7 +2,7 @@
 
 Kestrel separates collection loading, a typed resource/operation graph, plugin transforms, service validation, runtime emission and resource-class emission. Every generated method references the same frozen `operations` registry and service identity. This keeps execution, `.request()` builders, raw `.response()` calls, pagination and tooling aligned.
 
-This design draws on [Kubb's generation lifecycle](https://kubb.dev/docs/5.x/guide/going-further/creating-plugins) and [Hey API's client/SDK/plugin separation](https://heyapi.dev/docs/openapi/typescript/get-started). Kestrel's plugin contracts are its own Rust and TypeScript APIs.
+This design draws on [Kubb's generation lifecycle](https://kubb.dev/docs/5.x/guide/going-further/creating-plugins) and [Hey API's client/SDK/plugin separation](https://heyapi.dev/docs/openapi/typescript/get-started). Kestrel's plugin contracts are its own Rust and JavaScript APIs.
 
 ## Generation plugins
 
@@ -26,6 +26,10 @@ impl CodegenPlugin for Accounts {
         Ok(())
     }
 
+    fn declarations(&self) -> &str {
+        "export declare const accountsAdapter: { readonly name: 'accounts' };"
+    }
+
     fn runtime(&self) -> &str {
         "export const accountsAdapter = defineClientPlugin({ name: 'accounts' });"
     }
@@ -40,9 +44,9 @@ generator.generate_to(&collection.root, &destination, false, &progress)?;
 
 Plugins run in registration order on the shared graph. Names must be unique and nonempty. Errors retain plugin names and their original causes. Operation IDs and the service registry are synchronized after transforms, and naming/service collisions are checked before output. Generation remains deterministic and never edits source collection files. `generate_to` uses the same cancellation and staged publication as the CLI.
 
-`Generator::new()` defaults to modular output without an archive. Set `.output(OutputOptions { single_file, archive })` to change either flag. `generate()` returns a map of relative paths to file contents in `Generated.files` and an `entrypoint`; it does not assemble a duplicate monolithic source string. Archive packaging happens only during `generate_to()`.
+`Generator::new()` defaults to modular output without an archive. Set `.output(OutputOptions { single_file, archive, tanstack_query })` to configure the output and optional TanStack Query integration. `generate()` returns a map of relative paths to file contents in `Generated.files` and an `entrypoint`; it does not assemble a duplicate monolithic source string. Archive packaging happens only during `generate_to()`.
 
-`runtime()` supplies trusted TypeScript definitions, useful for adapters or helper exports. Modular output puts each plugin's source in its own `plugins/plugin-N.ts` and re-exports it from the SDK entry point; bundled output appends it to the shared module. References to `defineClientPlugin`, `operations` and `services` receive imports automatically in modular output. Other dependencies should be imported explicitly for that layout. It is executable source, so keep it in reviewed plugin code and typecheck both layouts when supporting both. Plugins are compiled into an embedding Rust program; the CLI and desktop use the default generator. They do not load arbitrary npm/Rust plugins from a collection or execute scripts embedded in requests.
+`runtime()` supplies trusted JavaScript source, useful for adapters or helper exports. Modular output puts each plugin's source in its own `plugins/plugin-N.js` and re-exports it from the SDK entry point; bundled output appends it to the shared module. `declarations()` supplies the corresponding `.d.ts` source. Include any imports that those types need; empty declarations export no types. References to `defineClientPlugin`, `operations` and `services` receive imports automatically in modular output. Other dependencies should be imported explicitly for that layout. It is executable source, so keep it in reviewed plugin code and typecheck both layouts when supporting both. Plugins are compiled into an embedding Rust program; the CLI and desktop use the default generator. They do not load arbitrary npm/Rust plugins from a collection or execute scripts embedded in requests.
 
 The SDK exports `services`, `operations`, `OperationId`, `ServiceName`, and `generation` (format version and custom plugin names). Descriptors contain unresolved templates and sanitized transport configuration; credentials and body examples are not materialized. Nonsecret literal headers/query defaults are included. Resource methods expose their descriptor as `.operation`.
 

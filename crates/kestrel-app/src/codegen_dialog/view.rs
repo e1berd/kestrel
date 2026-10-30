@@ -16,8 +16,20 @@ impl CodegenDialog {
         v_flex()
             .gap(dp(10.))
             .child(
+                Checkbox::new("codegen-tanstack-query")
+                    .label("Generate TanStack Query options")
+                    .checked(self.output.tanstack_query)
+                    .disabled(self.busy)
+                    .on_click(cx.listener(|view, checked: &bool, _, cx| {
+                        view.output.tanstack_query = *checked;
+                        view.report = None;
+                        view.error = None;
+                        cx.notify();
+                    })),
+            )
+            .child(
                 Checkbox::new("codegen-single-file")
-                    .label("Bundle into one TypeScript file")
+                    .label("Bundle JavaScript into one file (+ .d.ts)")
                     .checked(self.output.single_file)
                     .disabled(self.busy)
                     .on_click(cx.listener(|view, checked: &bool, _, cx| {
@@ -53,7 +65,7 @@ impl CodegenDialog {
                         if self.output.archive {
                             "Choose a ZIP file".into()
                         } else if self.output.single_file {
-                            "Choose a TypeScript file".into()
+                            "Choose a JavaScript file".into()
                         } else {
                             "Choose an SDK folder".into()
                         }
@@ -99,8 +111,8 @@ impl Render for CodegenDialog {
                     .max_h(rems(25.))
                     .overflow_y_scroll()
                     .gap(dp(18.))
-                    .child(hint("Turn saved requests into a TypeScript client with resource classes and async iterable lists.", cx))
-                    .child(hint("Save your edits first. The SDK uses fetch and needs no packages. Supply variables and credentials when creating the client.", cx))
+                    .child(hint("Turn saved requests into a JavaScript client with resource classes and async iterable lists.", cx))
+                    .child(hint("Save your edits first. The SDK uses fetch and includes separate .d.ts types. Supply variables and credentials when creating the client.", cx))
                     .child(self.render_output_options(cx))
                     .child(self.render_destination(cx))
                     .when(self.busy || self.report.is_some(), |element| element.child(crate::transfer_progress::render(&self.progress, cx)))

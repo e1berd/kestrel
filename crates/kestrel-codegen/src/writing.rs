@@ -6,7 +6,7 @@ use kestrel_core::Collection;
 use kestrel_core::report::ReportExt as _;
 use kestrel_core::transfer::{Progress, Unit};
 
-use crate::{Generated, Generator, OutputOptions, archive, publishing};
+use crate::{Generated, Generator, OutputOptions, archive, bundled_output, publishing};
 
 pub fn generate_to(source: &Path, destination: &Path, options: OutputOptions, overwrite: bool, progress: &Progress) -> Result<Generated> {
     Generator::new().output(options).generate_to(source, destination, overwrite, progress)
@@ -37,8 +37,7 @@ pub(crate) fn generate_with(
         if options.archive {
             archive::write(&temporary, &generated, options.single_file, progress)?;
         } else if options.single_file {
-            let source = &generated.files[&generated.entrypoint];
-            write_source(&temporary, source, progress)?;
+            bundled_output::write(&temporary, destination, &generated, progress)?;
         } else {
             std::fs::create_dir(&temporary)?;
             for (path, source) in &generated.files {
@@ -49,14 +48,17 @@ pub(crate) fn generate_with(
         progress.check()?;
         if directory {
             publishing::directory(&temporary, destination, overwrite, progress)?;
+        } else if options.single_file && !options.archive {
+            bundled_output::publish(&temporary, destination, overwrite, progress)?;
         } else {
             publishing::file(&temporary, destination, overwrite)?;
         }
         progress.published("SDK generated", generated.files.len() as u64, Unit::Files);
         Ok(generated)
     })();
-    if temporary.exists() {
-        if directory {
+    let retained_backup = result.is_err() && (temporary.join("previous-0").exists() || temporary.join("previous-1").exists());
+    if temporary.exists() && !retained_backup {
+        if temporary.is_dir() {
             std::fs::remove_dir_all(&temporary).report_err("remove SDK staging directory");
         } else {
             std::fs::remove_file(&temporary).report_err("remove SDK temporary file");
@@ -68,12 +70,14 @@ pub(crate) fn generate_with(
 fn validate_destination(destination: &Path, options: OutputOptions, overwrite: bool, progress: &Progress) -> Result<()> {
     progress.check()?;
     if !options.single_file && !options.archive {
-        if destination.extension().is_some_and(|extension| extension == "ts" || extension == "zip") {
-            bail!("the default SDK output is a directory; use --single-file for .ts or --archive for .zip");
+        if destination.extension().is_some_and(|extension| extension == "js" || extension == "ts" || extension == "zip") {
+            bail!("the default SDK output is a directory; use --single-file for .js or --archive for .zip");
         }
         publishing::check_directory(destination, overwrite, progress)?;
+    } else if !options.archive {
+        bundled_output::validate(destination, overwrite)?;
     } else {
-        let extension = if options.archive { "zip" } else { "ts" };
+        let extension = "zip";
         if destination.extension().is_none_or(|actual| actual != extension) {
             bail!("the SDK destination must end in .{extension}");
         }
@@ -90,7 +94,7 @@ fn validate_destination(destination: &Path, options: OutputOptions, overwrite: b
     Ok(())
 }
 
-fn write_source(path: &Path, source: &str, progress: &Progress) -> Result<()> {
+pub(crate) fn write_source(path: &Path, source: &str, progress: &Progress) -> Result<()> {
     std::fs::create_dir_all(path.parent().expect("a generated file has a parent"))?;
     let file = OpenOptions::new().write(true).create_new(true).open(path)?;
     let mut writer = progress.writer(file);

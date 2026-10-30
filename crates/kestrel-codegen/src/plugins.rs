@@ -5,13 +5,17 @@ use anyhow::{Context as _, Result, bail};
 use kestrel_core::Collection;
 use kestrel_core::transfer::{Progress, Unit};
 
-use crate::{Generated, OutputOptions, Resource, services, typescript};
+use crate::{Generated, OutputOptions, Resource, javascript, services};
 
 pub trait CodegenPlugin: Send + Sync {
     fn name(&self) -> &str;
 
     fn transform(&self, _resources: &mut Resource) -> Result<()> {
         Ok(())
+    }
+
+    fn declarations(&self) -> &str {
+        ""
     }
 
     fn runtime(&self) -> &str {
@@ -56,12 +60,12 @@ impl Generator {
         }
         let mut services = BTreeMap::new();
         services::synchronize(&mut resources, &[], &mut services)?;
-        progress.start("Generating TypeScript client", None, Unit::Requests)?;
-        let plugins: Vec<_> = self.plugins.iter().map(|plugin| (plugin.name(), plugin.runtime())).collect();
-        let (files, methods) = typescript::generate(&resources, &services, &plugins, self.output.single_file, progress)?;
+        progress.start("Generating JavaScript client", None, Unit::Requests)?;
+        let plugins: Vec<_> = self.plugins.iter().map(|plugin| (plugin.name(), plugin.runtime(), plugin.declarations())).collect();
+        let (files, methods) = javascript::generate(&resources, &services, &plugins, self.output, progress)?;
         Ok(Generated {
             files,
-            entrypoint: if self.output.single_file { "client.ts".into() } else { "index.ts".into() },
+            entrypoint: if self.output.single_file { "client.js".into() } else { "index.js".into() },
             requests: methods.len(),
             methods,
             warnings,

@@ -1,13 +1,14 @@
 mod assignment;
 mod build;
+mod bundled_output;
 mod collections;
+mod javascript;
 mod naming;
 mod plugins;
 mod publishing;
 mod route;
 mod security;
 mod services;
-mod typescript;
 mod writing;
 
 use std::collections::BTreeMap;
@@ -27,6 +28,7 @@ pub use writing::generate_to;
 pub struct OutputOptions {
     pub single_file: bool,
     pub archive: bool,
+    pub tanstack_query: bool,
 }
 
 #[derive(Debug, Clone)]

@@ -149,7 +149,7 @@ fn query_method_keeps_its_body_and_url_parameters_separate() {
         let original = std::fs::read(&path).unwrap();
         let generated = fixture.generated();
         assert_eq!(generated.methods, ["users.list", "users.query"]);
-        assert!(source(&generated).contains("Object.assign(<Response = unknown>(params: { query?:"));
+        assert!(source(&generated).contains("<Result = unknown>(params: { query?:"));
         assert!(source(&generated).contains("\"limit\"?: QueryValue; \"offset\"?: QueryValue }; body: JsonValue"));
         assert!(source(&generated).contains("\"method\":\"QUERY\""));
         assert!(source(&generated).contains("[\"limit\",\"10\"],[\"offset\",\"0\"]"));
@@ -243,18 +243,18 @@ fn writing_is_atomic_respects_cancellation_and_preserves_collection_bytes() {
     let mut fixture = Fixture::new();
     let path = fixture.add("GET", "/users/:user_id");
     let original = std::fs::read(&path).unwrap();
-    let destination = fixture.directory.join("client.ts");
-    let options = OutputOptions { single_file: true, archive: false };
+    let destination = fixture.directory.join("client.js");
+    let options = OutputOptions { single_file: true, ..Default::default() };
     let progress = Progress::default();
     let generated = generate_to(&fixture.collection.root, &destination, options, false, &progress).unwrap();
     assert!(progress.snapshot().finished);
-    assert_eq!(std::fs::read_to_string(&destination).unwrap(), source(&generated));
+    assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.files[&generated.entrypoint]);
     assert_eq!(std::fs::read(&path).unwrap(), original);
     assert!(generate_to(&fixture.collection.root, &destination, options, false, &Progress::default()).is_err());
     assert!(generate_to(&fixture.collection.root, &fixture.directory.join("request.yml"), options, true, &Progress::default()).is_err());
     let cancelled = Progress::default();
     cancelled.cancel();
     assert!(generate_to(&fixture.collection.root, &destination, options, true, &cancelled).is_err());
-    assert_eq!(std::fs::read_to_string(&destination).unwrap(), source(&generated));
-    assert_eq!(std::fs::read_dir(&fixture.directory).unwrap().count(), 2);
+    assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.files[&generated.entrypoint]);
+    assert_eq!(std::fs::read_dir(&fixture.directory).unwrap().count(), 3);
 }

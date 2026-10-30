@@ -1,0 +1,11 @@
+import type { ClientOptions, ServiceOptions, SearchParams, Operation, Parameters, RequestOptions } from './web.js';
+import { type ServiceName } from '../services.js';
+export declare function serviceOptions(options: ClientOptions, service: ServiceName, primary: ServiceName | undefined): ServiceOptions;
+export declare function primaryService(options: ClientOptions): ServiceName | undefined;
+export declare function httpUrl(input: string | URL): URL;
+export declare function toSearchParams(input?: SearchParams): URLSearchParams;
+export declare function operationUrl(operation: Operation, params: Parameters, base: URL, variables: Readonly<Record<string, string>>): URL;
+export declare function assertHeader(name: string): void;
+export declare function operationHeaders(operation: Operation, settings: ServiceOptions, request: RequestOptions, variables: Readonly<Record<string, string>>): Headers;
+export declare function assertSecureTransport(url: URL, settings: ServiceOptions, authenticated: boolean): void;
+export declare function sendsCredentials(operation: Operation, headers: Headers, url: URL, credentials: RequestCredentials, variables: Readonly<Record<string, string>>): boolean;

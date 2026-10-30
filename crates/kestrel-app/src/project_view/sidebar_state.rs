@@ -28,6 +28,7 @@ impl ProjectView {
         if Arc::ptr_eq(&self.sidebar.index, &project.tree) {
             return;
         }
+        self.tree_selection.retain_existing(&project.collection);
         self.sidebar = SidebarTree::new(project.tree.clone(), &self.expanded);
         self.schedule_filter(cx);
     }
@@ -59,6 +60,7 @@ impl ProjectView {
     }
 
     pub(super) fn toggle_folder(&mut self, path: &Path, cx: &mut Context<Self>) {
+        self.tree_selection.select(path);
         self.sidebar.toggle(path, &mut self.expanded);
         cx.notify();
     }

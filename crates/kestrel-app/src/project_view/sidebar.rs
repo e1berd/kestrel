@@ -2,17 +2,18 @@ use std::path::{Path, PathBuf};
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, AppContext as _, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, rems, uniform_list,
+    AnyElement, AppContext as _, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
+    StatefulInteractiveElement as _, Styled as _, div, rems, uniform_list,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::Input;
-use gpui_component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem};
+use gpui_component::menu::{ContextMenuExt as _, DropdownMenu as _};
 use gpui_component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit_assets::IconName;
 
 use super::ProjectView;
 use super::dragging::TreeDrag;
+use super::sidebar_menus::{collection_menu, creation_menu, row_menu};
 use crate::appearance::{self, dp};
 use crate::ui::{ReportUnlessGone as _, method_label};
 
@@ -26,8 +27,6 @@ struct Row {
     count: usize,
 }
 
-type TreeAction = fn(&mut ProjectView, PathBuf, &mut Window, &mut Context<ProjectView>);
-
 impl ProjectView {
     pub(super) fn render_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
         let palette = appearance::palette(cx);
@@ -35,7 +34,9 @@ impl ProjectView {
 
         let active_path = self.active_tab().map(|tab| tab.read(cx).path.clone());
         let load_error = project.load_error.clone();
+        let view = cx.entity().downgrade();
         v_flex()
+            .id("collection-sidebar")
             .size_full()
             .pt(dp(8.))
             .px(dp(6.))
@@ -80,6 +81,7 @@ impl ProjectView {
                     )
                     .child(self.render_root_drop_zone(cx)),
             )
+            .context_menu(move |menu, _, _| creation_menu(menu, view.clone(), None))
             .into_any_element()
     }
 
@@ -123,7 +125,7 @@ impl ProjectView {
     fn render_row(&self, row: Row, active: Option<&Path>, cx: &mut Context<Self>) -> AnyElement {
         let palette = appearance::palette(cx);
         let active_background = cx.theme().list_active;
-        let is_active = active == Some(row.path.as_path());
+        let is_active = self.tree_selection.path().or(active) == Some(row.path.as_path());
         let is_folder = row.method.is_none();
         let path = row.path.clone();
         let indent = row.depth as f32 * 14. + if is_folder { 8. } else { 30. };
@@ -178,51 +180,14 @@ impl ProjectView {
                     view.open_request(&path, window, cx);
                 }
             }))
-            .context_menu(move |menu, _, _| row_menu(menu, view.clone(), menu_path.clone(), is_folder))
+            .context_menu(move |menu, _, cx| {
+                view.update(cx, |view, cx| {
+                    view.tree_selection.select(&menu_path);
+                    cx.notify();
+                })
+                .report_unless_gone("select a collection item");
+                row_menu(menu, view.clone(), menu_path.clone(), is_folder)
+            })
             .into_any_element()
     }
-}
-
-fn row_menu(menu: PopupMenu, view: gpui::WeakEntity<ProjectView>, path: PathBuf, is_folder: bool) -> PopupMenu {
-    let item = |label: &'static str, action: TreeAction| {
-        let view = view.clone();
-        let path = path.clone();
-        PopupMenuItem::new(label).on_click(move |_, window, cx| {
-            let path = path.clone();
-            view.update(cx, |view, cx| action(view, path, window, cx)).report_unless_gone("run a collection tree action");
-        })
-    };
-    let menu = if is_folder {
-        menu.item(item("New request", |view, path, window, cx| view.new_request(Some(path), window, cx)))
-            .item(item("New folder", |view, path, window, cx| view.new_folder(Some(path), window, cx)))
-            .separator()
-    } else {
-        menu.item(item("Open", |view, path, window, cx| view.open_request(&path, window, cx)))
-            .item(item("Duplicate", |view, path, window, cx| view.duplicate(path, window, cx)))
-    };
-    menu.item(item("Rename…", |view, path, window, cx| view.rename(path, window, cx)))
-        .item(item("Show in file manager", |_, path, _, cx| cx.reveal_path(&path)))
-        .separator()
-        .item(item("Delete…", |view, path, window, cx| view.delete(path, window, cx)))
-}
-
-fn collection_menu(menu: PopupMenu, view: gpui::WeakEntity<ProjectView>) -> PopupMenu {
-    let item = |label: &'static str, action: fn(&mut ProjectView, &mut Window, &mut Context<ProjectView>)| {
-        let view = view.clone();
-        PopupMenuItem::new(label).on_click(move |_, window, cx| {
-            view.update(cx, |view, cx| action(view, window, cx)).report_unless_gone("run a collection action");
-        })
-    };
-    menu.item(item("New folder", |view, window, cx| view.new_folder(None, window, cx)))
-        .item(item("Environments…", |view, window, cx| view.open_environments(window, cx)))
-        .item(item("Sync from OpenAPI", |view, window, cx| view.sync_openapi(window, cx)))
-        .item(item("Export collection…", |view, window, cx| crate::export_dialog::open(view.root(cx), window, cx)))
-        .item(item("Generate SDK…", |view, window, cx| crate::codegen_dialog::open(view.root(cx), window, cx)))
-        .separator()
-        .item(item("Reload from disk", |view, _, cx| view.project.update(cx, |project, cx| project.reload(cx))))
-        .item(item("Show in file manager", |view, _, cx| reveal_collection(view, cx)))
-}
-
-fn reveal_collection(view: &ProjectView, cx: &mut App) {
-    cx.reveal_path(&view.root(cx).join(kestrel_core::collection::COLLECTION_FILE));
 }

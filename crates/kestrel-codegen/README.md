@@ -1,6 +1,6 @@
 # Resource SDK generation
 
-Generate a TypeScript SDK from the saved HTTP requests in any Kestrel collection, including collections imported from OpenAPI, Swagger or Apidog:
+Generate a JavaScript SDK with JSDoc and separate `.d.ts` declarations from the saved HTTP requests in any Kestrel collection, including collections imported from OpenAPI, Swagger or Apidog:
 
 ```bash
 cargo cli codegen path/to/collection --out sdk
@@ -10,26 +10,31 @@ The default output is a directory of modules, without an archive. `--single-file
 
 | Options | Destination | Output |
 | --- | --- | --- |
-| Default | `--out sdk` | Directory of TypeScript modules |
-| `--single-file` | `--out client.ts` | One self-contained TypeScript file |
+| Default | `--out sdk` | Directory of `.js` modules and `.d.ts` declarations |
+| `--single-file` | `--out client.js` | One self-contained JS file and its `client.d.ts` |
 | `--archive` | `--out sdk.zip` | ZIP containing the module tree |
-| `--single-file --archive` | `--out sdk.zip` | ZIP containing `client.ts` |
+| `--single-file --archive` | `--out sdk.zip` | ZIP containing `client.js` and `client.d.ts` |
 
 Use `--overwrite` to replace an existing SDK. Directory replacement accepts an empty folder or an existing Kestrel-generated SDK with no unrelated files. Its manifest tracks ownership and obsolete modules, so stale generated files are removed and unrelated files/symlinks prevent replacement. SDKs are staged before publication; failures/cancellation preserve the previous output. ZIP entries use portable paths, fixed timestamps and stable ordering. Modular archives include the ownership manifest, so an extracted SDK can be regenerated in place.
 
-`--language typescript` is the default and currently the only target. In the desktop app, choose **Generate SDK…** from the collection menu, the project menu or the command palette. Both **Bundle into one TypeScript file** and **Pack into a ZIP archive** start unchecked. Save request edits before generating.
+`--language javascript` is the default and currently the only target. In the desktop app, choose **Generate SDK…** from the collection menu, the project menu or the command palette. **Generate TanStack Query options**, **Bundle JavaScript into one file (+ .d.ts)** and **Pack into a ZIP archive** start unchecked. Save request edits before generating.
 
 ## Module layout
 
-The directory entry point is `index.ts`. Import it as `./sdk/index.js` with NodeNext, or through your application's TypeScript bundler. Generated imports use `.js` extensions, so emitted JavaScript runs in Node without a TypeScript loader.
+The directory entry point is `index.js`. Import it directly as `./sdk/index.js`. Every JS module has an adjacent `.d.ts` declaration file, so editors and TypeScript consumers retain argument checking and completion without compiling the SDK. Generated files are ES modules; Node projects should use `"type": "module"` in their package.json. Bundled output uses the chosen filename for both companions, for example `api.js` and `api.d.ts`.
 
 ```text
 sdk/
-  index.ts
-  client.ts
-  services.ts
-  operations.ts
-  generation.ts
+  index.js
+  index.d.ts
+  client.js
+  client.d.ts
+  services.js
+  services.d.ts
+  operations.js
+  operations.d.ts
+  generation.js
+  generation.d.ts
   lib/
   resources/
   operations/
@@ -40,7 +45,7 @@ sdk/
 
 `lib` contains separate transport, auth, cookie, hook and collection modules. Each operation has its own descriptor and callable factory; each resource has its own class. Large member groups, operation registries and export lists are split into bounded chunks instead of accumulating in one resource/index file. The public Resource/Collection/Request API is the same in both layouts. Single-file mode is for consumers that explicitly prefer a bundle and can produce a large file.
 
-```typescript
+```javascript
 import { createClient, ApiError } from "./sdk/index.js";
 
 const client = createClient({
@@ -57,7 +62,31 @@ await client.users.delete({ userId: "42" });
 await client.users.messages.get({ userId: "42", messageId: "hello/world" });
 ```
 
-The client uses the platform `fetch`, `Headers`, `FormData` and `URLSearchParams`. It works in browsers and modern Node.js without runtime packages. Compile with TypeScript targeting ES2022 and DOM types; include `ESNext.Array` types when using `Array.fromAsync`. Single-resource and custom requests return the decoded response directly: JSON for JSON media types (including `+json`), text otherwise, and `undefined` for an empty response. List operations return an async iterable `Collection`. Unsuccessful responses throw `ApiError` with `status`, `response` and the raw response `body`. Network failures and cancellation propagate to the caller.
+The client uses the platform `fetch`, `Headers`, `FormData` and `URLSearchParams`. It works in browsers and modern Node.js without runtime packages. The runtime uses ES2022 syntax. When consuming the declarations with TypeScript, include ES2022 and DOM types, plus `ESNext.Array` when using `Array.fromAsync`. Single-resource and custom requests return the decoded response directly: JSON for JSON media types (including `+json`), text otherwise, and `undefined` for an empty response. List operations return an async iterable `Collection`. Unsuccessful responses throw `ApiError` with `status`, `response` and the raw response `body`. Network failures and cancellation propagate to the caller.
+
+## Optional TanStack Query integration
+
+Enable **Generate TanStack Query options** in the desktop dialog or pass `--tanstack-query`:
+
+```bash
+cargo cli codegen path/to/collection --out sdk --tanstack-query
+```
+
+GET, HEAD and QUERY methods gain `.queryOptions(params, requestOptions)`. Other HTTP methods gain `.mutationOptions(requestOptions)`. These factories return standard options accepted by TanStack Query v5; they do not import React or TanStack packages into the generated client. The consuming application supplies its own TanStack Query installation. Ordinary SDK methods remain available with either setting.
+
+```javascript
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { createClient } from './sdk/index.js';
+
+const client = createClient({ baseUrl: 'https://api.example.com' });
+const userOptions = client.users.get.queryOptions({ userId: '42' });
+const user = useQuery(userOptions);
+const createUser = useMutation(client.users.insert.mutationOptions());
+createUser.mutate({ body: { displayName: 'Ada' } });
+await queryClient.prefetchQuery(userOptions);
+```
+
+Query keys include the service, operation, a snapshot of parameters and request options, and an identity unique to the client instance. Reuse a client instance to share cached results; create a new client or clear the query cache when changing users or credentials. Search parameters preserve repeated values. Query parameters and bodies must contain finite JSON values; native `URLSearchParams` and `Headers` are supported. Query cancellation propagates to fetch and combines with an explicit request signal. List queries collect every page into an array before caching; ordinary list calls retain lazy iteration. Mutations use the variables passed to `mutate` as SDK parameters. Application code controls invalidation, retries and stale times using ordinary TanStack options.
 
 ## Native Web APIs and multiple services
 
@@ -235,6 +264,6 @@ cargo test -p kestrel-cli --test import_e2e codegen
 cargo test -p kestrel-codegen --test runtime -- --include-ignored
 ```
 
-The last command requires Node.js 24+. It exercises the generated SDK with an injected fetch and a real local HTTP server. Set `KESTREL_TYPESCRIPT_COMPILER` to the path of TypeScript's `lib/tsc.js` to also compile and execute the modular output, emit declarations, check unused imports and verify valid/invalid API usage. Output tests cover all four modes, ZIP contents/reproducibility, replacement ownership, stale-file cleanup, cancellation, symlinks and module sizes for large resource groups. No npm packages are installed by the tests.
+The last command requires Node.js 24+. It exercises the generated SDK with an injected fetch and a real local HTTP server. Set `KESTREL_TYPESCRIPT_COMPILER` to the path of TypeScript's `lib/tsc.js` to also check declarations, unused imports and valid/invalid API usage in both layouts. Both layouts execute directly as JavaScript, with and without TanStack options. Optional `KESTREL_TANSTACK_QUERY_CORE` and `KESTREL_TANSTACK_QUERY_REACT` paths to installed packages' JS entry points enable integration checks against a real QueryClient and React Query declarations. Output tests cover all four modes, ZIP contents/reproducibility, replacement ownership, stale-file cleanup, cancellation, symlinks and module sizes for large resource groups. No npm packages are installed by the tests.
 
 Tokio is already used by Kestrel's network and script runtime. Generation consists of CPU work and blocking filesystem/compression operations; the desktop runs it through GPUI's background executor. Async Rust consumers should use `tokio::task::spawn_blocking` with an owned generator and paths rather than performing this work directly on an async task's polling thread.

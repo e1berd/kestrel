@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AppContext as _, Context, Div, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Window, div,
-    relative, rems,
+    AppContext as _, Context, Div, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, Render,
+    StatefulInteractiveElement as _, Styled as _, Window, div, relative, rems,
 };
 use gpui_component::{Icon, h_flex};
 use gpui_kit_assets::IconName;
@@ -50,6 +50,10 @@ impl ProjectView {
             .id("collection-root-drop")
             .rounded(dp(6.))
             .child(eyebrow("Requests", cx))
+            .on_click(cx.listener(|view, _, _, cx| {
+                view.tree_selection.select(&view.root(cx));
+                cx.notify();
+            }))
     }
 
     pub(super) fn render_drop_zones(&self, path: &Path, name: &str, is_folder: bool, cx: &mut Context<Self>) -> impl IntoElement {
@@ -163,6 +167,7 @@ impl ProjectView {
     }
 
     fn relocate_tree_state(&mut self, old: &Path, new: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        self.tree_selection.relocate(old, new);
         self.expanded = self
             .expanded
             .iter()

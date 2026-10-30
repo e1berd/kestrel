@@ -33,7 +33,7 @@ pub fn open(source: PathBuf, window: &mut Window, cx: &mut App) {
         report: None,
         output: Default::default(),
     });
-    window.open_dialog(cx, move |dialog, _, _| dialog.title("Generate TypeScript SDK").w(dp(640.)).child(view.clone()));
+    window.open_dialog(cx, move |dialog, _, _| dialog.title("Generate JavaScript SDK").w(dp(640.)).child(view.clone()));
 }
 
 impl Drop for CodegenDialog {

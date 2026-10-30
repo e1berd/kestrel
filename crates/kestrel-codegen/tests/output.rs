@@ -48,41 +48,55 @@ fn read_zip(path: &Path) -> BTreeMap<PathBuf, String> {
 #[test]
 fn the_default_is_a_directory_and_the_two_output_flags_are_independent() {
     let fixture = Fixture::new();
-    assert_eq!(OutputOptions::default(), OutputOptions { single_file: false, archive: false });
-    for single_file in [false, true] {
-        for archive in [false, true] {
-            let options = OutputOptions { single_file, archive };
-            let name = if archive {
-                format!("sdk-{single_file}.zip")
-            } else if single_file {
-                "client.ts".into()
-            } else {
-                "sdk".into()
-            };
-            let destination = fixture.directory.join(name);
-            let generated = fixture.write(&destination, options, false).unwrap();
-            assert_eq!(generated.entrypoint, Path::new(if single_file { "client.ts" } else { "index.ts" }));
-            assert_eq!(generated.files.len() == 1, single_file);
-            if archive {
-                let mut files = read_zip(&destination);
-                if !single_file {
-                    let marker = files.remove(Path::new(".kestrel-codegen.json")).unwrap();
-                    assert_eq!(serde_json::from_str::<serde_json::Value>(&marker).unwrap()["version"], 1);
+    assert_eq!(OutputOptions::default(), OutputOptions { single_file: false, ..Default::default() });
+    for tanstack_query in [false, true] {
+        for single_file in [false, true] {
+            for archive in [false, true] {
+                let options = OutputOptions { single_file, archive, tanstack_query };
+                let name = if archive {
+                    format!("sdk-{single_file}-{tanstack_query}.zip")
+                } else if single_file {
+                    "client.js".into()
+                } else {
+                    "sdk".into()
+                };
+                let parent = fixture.directory.join(format!("query-{tanstack_query}"));
+                std::fs::create_dir_all(&parent).unwrap();
+                let destination = parent.join(name);
+                let generated = fixture.write(&destination, options, false).unwrap();
+                assert_eq!(generated.entrypoint, Path::new(if single_file { "client.js" } else { "index.js" }));
+                assert_eq!(generated.files.len() == 2, single_file);
+                assert!(generated.files.keys().all(|path| path.extension().unwrap() == "js" || path.to_string_lossy().ends_with(".d.ts")));
+                let javascript: String = generated
+                    .files
+                    .iter()
+                    .filter(|(path, _)| path.extension().unwrap() == "js")
+                    .map(|(_, source)| source.as_str())
+                    .collect();
+                assert_eq!(javascript.contains("queryOptions(params"), tanstack_query);
+                assert!(javascript.contains("@param"));
+                if archive {
+                    let mut files = read_zip(&destination);
+                    if !single_file {
+                        let marker = files.remove(Path::new(".kestrel-codegen.json")).unwrap();
+                        assert_eq!(serde_json::from_str::<serde_json::Value>(&marker).unwrap()["version"], 1);
+                    }
+                    assert_eq!(files, generated.files);
+                    let original = std::fs::read(&destination).unwrap();
+                    fixture.write(&destination, options, true).unwrap();
+                    assert_eq!(std::fs::read(&destination).unwrap(), original);
+                } else if single_file {
+                    assert!(destination.with_extension("d.ts").is_file());
+                    assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.files[&generated.entrypoint]);
+                } else {
+                    for (path, source) in &generated.files {
+                        assert_eq!(std::fs::read_to_string(destination.join(path)).unwrap(), *source);
+                    }
+                    assert!(destination.join("lib/web.js").is_file());
+                    assert!(destination.join("resources/UsersResource.js").is_file());
                 }
-                assert_eq!(files, generated.files);
-                let original = std::fs::read(&destination).unwrap();
-                fixture.write(&destination, options, true).unwrap();
-                assert_eq!(std::fs::read(&destination).unwrap(), original);
-            } else if single_file {
-                assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.files[&generated.entrypoint]);
-            } else {
-                for (path, source) in &generated.files {
-                    assert_eq!(std::fs::read_to_string(destination.join(path)).unwrap(), *source);
-                }
-                assert!(destination.join("lib/web.ts").is_file());
-                assert!(destination.join("resources/UsersResource.ts").is_file());
+                assert!(fixture.write(&destination, options, false).is_err());
             }
-            assert!(fixture.write(&destination, options, false).is_err());
         }
     }
 }
@@ -150,4 +164,38 @@ fn directory_outputs_refuse_symlinks_instead_of_following_them() {
     assert!(fixture.collection.root.join("opencollection.yml").is_file());
     let path = generated.files.keys().next().unwrap();
     assert!(destination.join(path).is_file());
+}
+
+#[test]
+fn bundled_output_validates_both_files_and_supports_custom_names() {
+    let fixture = Fixture::new();
+    let destination = fixture.directory.join("custom-client.js");
+    let declarations = destination.with_extension("d.ts");
+    let options = OutputOptions { single_file: true, ..Default::default() };
+    std::fs::write(&declarations, "keep these types").unwrap();
+    assert!(fixture.write(&destination, options, false).is_err());
+    assert!(!destination.exists());
+    assert_eq!(std::fs::read_to_string(&declarations).unwrap(), "keep these types");
+    fixture.write(&destination, options, true).unwrap();
+    let javascript = std::fs::read_to_string(&destination).unwrap();
+    assert!(javascript.contains("import(\"./custom-client.js\")"));
+    assert!(!javascript.contains("./client.js"));
+    assert!(std::fs::read_to_string(&declarations).unwrap().contains("export declare class Client"));
+    std::fs::remove_file(&declarations).unwrap();
+    std::fs::create_dir(&declarations).unwrap();
+    assert!(fixture.write(&destination, options, true).is_err());
+    assert_eq!(std::fs::read_to_string(&destination).unwrap(), javascript);
+}
+
+#[cfg(unix)]
+#[test]
+fn bundled_output_refuses_symlinked_declarations() {
+    let fixture = Fixture::new();
+    let destination = fixture.directory.join("client.js");
+    let unrelated = fixture.directory.join("notes.txt");
+    std::fs::write(&unrelated, "keep these notes").unwrap();
+    std::os::unix::fs::symlink(&unrelated, destination.with_extension("d.ts")).unwrap();
+    assert!(fixture.write(&destination, OutputOptions { single_file: true, ..Default::default() }, true).is_err());
+    assert!(!destination.exists());
+    assert_eq!(std::fs::read_to_string(unrelated).unwrap(), "keep these notes");
 }

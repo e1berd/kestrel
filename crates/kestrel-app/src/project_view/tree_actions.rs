@@ -14,7 +14,7 @@ use crate::ui::ReportUnlessGone as _;
 
 impl ProjectView {
     pub fn new_request(&mut self, dir: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        let dir = dir.unwrap_or_else(|| self.root(cx));
+        let dir = dir.unwrap_or_else(|| self.tree_selection.directory(&self.project.read(cx).collection));
         let view = cx.entity().downgrade();
         ask_text(window, cx, "New request", "Request name", "", move |name, window, cx| {
             let dir = dir.clone();
@@ -35,7 +35,7 @@ impl ProjectView {
     }
 
     pub fn new_folder(&mut self, parent: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        let parent = parent.unwrap_or_else(|| self.root(cx));
+        let parent = parent.unwrap_or_else(|| self.tree_selection.directory(&self.project.read(cx).collection));
         let view = cx.entity().downgrade();
         ask_text(window, cx, "New folder", "Folder name", "", move |name, window, cx| {
             let parent = parent.clone();
@@ -43,6 +43,7 @@ impl ProjectView {
                 match view.project.update(cx, |project, _| project.edit_tree(|collection| collection.add_folder(&parent, &name))) {
                     Ok(dir) => {
                         view.expanded.insert(parent.clone());
+                        view.tree_selection.select(&dir);
                         view.expanded.insert(dir);
                         cx.notify();
                     }
@@ -69,6 +70,8 @@ impl ProjectView {
     }
 
     fn reopen_moved_tabs(&mut self, old: &Path, new: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        self.tree_selection.relocate(old, new);
+        let selected_path = self.tree_selection.path().map(Path::to_path_buf);
         let moved: Vec<PathBuf> = self
             .tabs
             .iter()
@@ -80,6 +83,9 @@ impl ProjectView {
         for path in moved {
             let path = if path.as_os_str().is_empty() { new.to_path_buf() } else { path };
             self.open_request(&path, window, cx);
+        }
+        if let Some(path) = selected_path {
+            self.tree_selection.select(&path);
         }
     }
 

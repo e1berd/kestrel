@@ -2,11 +2,13 @@ mod dragging;
 mod empty_state;
 mod openapi_sync;
 mod sidebar;
+mod sidebar_menus;
 mod sidebar_state;
 mod tab_dragging;
 mod tab_strip;
 mod tree_actions;
 mod tree_hover;
+mod tree_selection;
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -39,6 +41,7 @@ pub struct ProjectView {
     layout: Entity<ResizableState>,
     tree_scroll: gpui::UniformListScrollHandle,
     sidebar: SidebarTree,
+    tree_selection: tree_selection::TreeSelection,
     filter_task: Option<Task<()>>,
     tree_hover: Option<(PathBuf, Task<()>)>,
     filtering: bool,
@@ -74,6 +77,7 @@ impl ProjectView {
             layout: cx.new(|_| ResizableState::default()),
             tree_scroll: Default::default(),
             sidebar,
+            tree_selection: Default::default(),
             filter_task: None,
             tree_hover: None,
             filtering: false,
@@ -99,6 +103,7 @@ impl ProjectView {
 
     pub fn open_request(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(index) = self.tabs.iter().position(|tab| tab.read(cx).path == path) {
+            self.tree_selection.select(path);
             self.reveal_request(path, window, cx);
             self.active = index;
             cx.notify();
@@ -107,6 +112,7 @@ impl ProjectView {
         if self.project.read(cx).collection.request(path).is_none() {
             return;
         }
+        self.tree_selection.select(path);
         self.reveal_request(path, window, cx);
         let project = self.project.clone();
         let path = path.to_path_buf();
@@ -140,8 +146,8 @@ impl ProjectView {
     pub fn cycle_tab(&mut self, is_forward: bool, cx: &mut Context<Self>) {
         let count = self.tabs.len();
         if count > 0 {
-            self.active = if is_forward { (self.active + 1) % count } else { (self.active + count - 1) % count };
-            cx.notify();
+            let index = if is_forward { (self.active + 1) % count } else { (self.active + count - 1) % count };
+            self.activate_tab(index, cx);
         }
     }
 
@@ -155,6 +161,10 @@ impl ProjectView {
 
     fn activate_tab(&mut self, index: usize, cx: &mut Context<Self>) {
         self.active = index;
+        if let Some(tab) = self.active_tab() {
+            let path = tab.read(cx).path.clone();
+            self.tree_selection.select(&path);
+        }
         cx.notify();
     }
 

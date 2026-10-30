@@ -5,6 +5,8 @@ import { once } from "node:events";
 
 const sdk = await import(pathToFileURL(process.argv[2]).href);
 const { createClient, ApiError } = sdk;
+const { verifyTanStack } = await import("./tanstack.mjs");
+await verifyTanStack(sdk);
 const { verifyCollections } = await import("./collections.mjs");
 await verifyCollections(sdk);
 const { verifyWeb } = await import("./web.mjs");

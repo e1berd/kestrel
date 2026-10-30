@@ -29,7 +29,7 @@ fn apidog_duplicate_requests_get_unique_names_and_allow_explicit_overrides() {
     let directory = Directory::new();
     let root = directory.0.join("collection");
     succeed(directory.cli().arg("import").arg(fixtures().join("apidog.json")).arg("--out").arg(&root));
-    let destination = directory.0.join("client.ts");
+    let destination = directory.0.join("client.js");
     let before = snapshot(&root);
     let output = succeed(directory.cli().arg("codegen").arg("--single-file").arg(&root).arg("--out").arg(&destination));
     assert!(String::from_utf8_lossy(&output.stderr).contains("Renamed inferred SDK method pets.insert"));
@@ -70,7 +70,7 @@ fn codegen_cli_exposes_independent_archive_and_single_file_flags() {
             let destination = directory.0.join(if archive {
                 format!("sdk-{single_file}.zip")
             } else if single_file {
-                "client.ts".into()
+                "client.js".into()
             } else {
                 "sdk".into()
             });
@@ -88,7 +88,7 @@ fn codegen_cli_exposes_independent_archive_and_single_file_flags() {
             } else if single_file {
                 assert!(std::fs::read_to_string(destination).unwrap().contains("export class Client"));
             } else {
-                assert!(destination.join("index.ts").is_file());
+                assert!(destination.join("index.js").is_file());
             }
         }
     }

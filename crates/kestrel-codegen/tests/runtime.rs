@@ -14,7 +14,7 @@ impl Drop for Directory {
 }
 
 #[test]
-#[ignore = "requires Node.js 24 or newer; set KESTREL_TYPESCRIPT_COMPILER to also run tsc"]
+#[ignore = "requires Node.js 24 or newer; set KESTREL_TYPESCRIPT_COMPILER to also check declarations"]
 fn generated_sdk_sends_requests_and_obeys_its_types() {
     let directory = Directory(std::env::temp_dir().join(format!("kestrel-sdk-runtime-{}", uuid::Uuid::new_v4())));
     let mut collection = Collection::create(&directory.0.join("collection"), "Library").unwrap();
@@ -105,68 +105,66 @@ fn generated_sdk_sends_requests_and_obeys_its_types() {
         request.http.as_mut().unwrap().auth = Some(Auth::Config(AuthConfig::new("bearer")));
         microservices.add_request(&microservices_root, request).unwrap();
     }
-    let single_file = kestrel_codegen::OutputOptions { single_file: true, archive: false };
-    let other_destination = directory.0.join("microservices.ts");
-    kestrel_codegen::generate_to(&microservices_root, &other_destination, single_file, false, &Progress::default()).unwrap();
-    let destination = directory.0.join("client.ts");
-    std::fs::write(directory.0.join("package.json"), "{\"type\":\"module\"}").unwrap();
-    kestrel_codegen::generate_to(&root, &destination, single_file, false, &Progress::default()).unwrap();
-    if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
-        let valid = directory.0.join("valid.ts");
-        std::fs::write(&valid, include_str!("valid.ts")).unwrap();
-        let output = Command::new("node")
-            .arg(&compiler)
-            .args([
-                "--strict",
-                "--noEmit",
-                "--target",
-                "ES2022",
-                "--lib",
-                "ES2022,ESNext.Array,DOM",
-                "--module",
-                "NodeNext",
-                "--allowImportingTsExtensions",
-            ])
-            .arg(&valid)
-            .output()
-            .expect("typecheck generated SDK");
+    for tanstack_query in [false, true] {
+        let directory = directory.0.join(if tanstack_query { "with-query" } else { "plain" });
+        std::fs::create_dir(&directory).unwrap();
+        let single_file = kestrel_codegen::OutputOptions { single_file: true, tanstack_query, ..Default::default() };
+        let other_destination = directory.join("microservices.js");
+        kestrel_codegen::generate_to(&microservices_root, &other_destination, single_file, false, &Progress::default()).unwrap();
+        let destination = directory.join("client.js");
+        std::fs::write(directory.join("package.json"), "{\"type\":\"module\"}").unwrap();
+        kestrel_codegen::generate_to(&root, &destination, single_file, false, &Progress::default()).unwrap();
+        if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
+            let valid = directory.join("valid.ts");
+            std::fs::write(&valid, runtime_output::valid_source(tanstack_query)).unwrap();
+            let output = Command::new("node")
+                .arg(&compiler)
+                .args([
+                    "--strict",
+                    "--noEmit",
+                    "--target",
+                    "ES2022",
+                    "--lib",
+                    "ES2022,ESNext.Array,DOM",
+                    "--module",
+                    "NodeNext",
+                    "--allowImportingTsExtensions",
+                ])
+                .arg(&valid)
+                .output()
+                .expect("typecheck generated SDK");
+            assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+            std::fs::write(
+                &valid,
+                "import { createClient } from './client.js'; createClient().users.get({}); createClient().users.list().then(() => {});",
+            )
+            .unwrap();
+            let output = Command::new("node")
+                .arg(compiler)
+                .args([
+                    "--strict",
+                    "--noEmit",
+                    "--target",
+                    "ES2022",
+                    "--lib",
+                    "ES2022,ESNext.Array,DOM",
+                    "--module",
+                    "NodeNext",
+                    "--allowImportingTsExtensions",
+                ])
+                .arg(&valid)
+                .output()
+                .expect("check that missing path arguments are rejected");
+            assert!(!output.status.success());
+            assert!(String::from_utf8_lossy(&output.stdout).contains("userId"));
+            assert!(String::from_utf8_lossy(&output.stdout).contains("then"));
+        }
+        let script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/runtime.mjs");
+        let output = Command::new("node").arg(script).arg(&destination).arg(&other_destination).output().expect("run Node.js 24");
         assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
-        std::fs::write(
-            &valid,
-            "import { createClient } from './client.ts'; createClient().users.get({}); createClient().users.list().then(() => {});",
-        )
-        .unwrap();
-        let output = Command::new("node")
-            .arg(compiler)
-            .args([
-                "--strict",
-                "--noEmit",
-                "--target",
-                "ES2022",
-                "--lib",
-                "ES2022,ESNext.Array,DOM",
-                "--module",
-                "NodeNext",
-                "--allowImportingTsExtensions",
-            ])
-            .arg(&valid)
-            .output()
-            .expect("check that missing path arguments are rejected");
-        assert!(!output.status.success());
-        assert!(String::from_utf8_lossy(&output.stdout).contains("userId"));
-        assert!(String::from_utf8_lossy(&output.stdout).contains("then"));
-    }
-    let script = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/runtime.mjs");
-    let output = Command::new("node")
-        .arg("--experimental-transform-types")
-        .arg(script)
-        .arg(&destination)
-        .arg(&other_destination)
-        .output()
-        .expect("run Node.js 24");
-    assert!(output.status.success(), "{}\n{}", String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
-    if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
-        runtime_output::verify(&directory.0, &root, &microservices_root, &compiler);
+        if let Some(compiler) = std::env::var_os("KESTREL_TYPESCRIPT_COMPILER") {
+            runtime_output::verify(&directory, &root, &microservices_root, &compiler, tanstack_query);
+        }
     }
 }
 mod runtime_output;

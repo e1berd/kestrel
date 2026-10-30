@@ -25,12 +25,14 @@ pub(super) enum Command {
         collection: PathBuf,
         #[arg(short, long)]
         out: PathBuf,
-        #[arg(long, default_value = "typescript", value_parser = ["typescript"])]
+        #[arg(long, default_value = "javascript", value_parser = ["javascript"])]
         language: String,
         #[arg(long)]
         single_file: bool,
         #[arg(long)]
         archive: bool,
+        #[arg(long)]
+        tanstack_query: bool,
         #[arg(long)]
         overwrite: bool,
     },

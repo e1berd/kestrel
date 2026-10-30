@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub(super) const GROUP_SIZE: usize = 64;
-pub(super) type Files = BTreeMap<PathBuf, String>;
+use super::{Files, insert};
 
 pub(super) fn import_path(from: &Path, to: &Path) -> String {
     let parent: Vec<_> = from.parent().expect("a generated module has a parent").iter().collect();
@@ -23,7 +22,7 @@ pub(super) fn records(files: &mut Files, root: &Path, mut parts: Vec<PathBuf>, f
             .chunks(GROUP_SIZE)
             .enumerate()
             .map(|(index, children)| {
-                let path = directory.join(format!("group-{level}-{index}.ts"));
+                let path = directory.join(format!("group-{level}-{index}.js"));
                 merge(files, &path, children, factory);
                 path
             })
@@ -36,22 +35,31 @@ pub(super) fn records(files: &mut Files, root: &Path, mut parts: Vec<PathBuf>, f
 fn merge(files: &mut Files, path: &Path, parts: &[PathBuf], factory: bool) {
     let symbol = if factory { "createMembers" } else { "operations" };
     let mut source = String::new();
-    if factory {
-        source.push_str(&format!("import type {{ Executor }} from '{}';\n", import_path(path, Path::new("lib/collection.ts"))));
-    }
     for (index, part) in parts.iter().enumerate() {
         source.push_str(&format!("import {{ {symbol} as part{index} }} from '{}';\n", import_path(path, part)));
     }
+    let mut declarations = source.clone();
     source.push_str(if factory {
-        "\nexport function createMembers(execute: Executor) {\n  return Object.freeze({\n"
+        "\nexport function createMembers(execute) {\n  return Object.freeze({\n"
     } else {
         "\nexport const operations = Object.freeze({\n"
     });
+    let mut types = Vec::new();
     for index in 0..parts.len() {
         source.push_str(&format!("  ...part{index}{},\n", if factory { "(execute)" } else { "" }));
+        types.push(if factory { format!("ReturnType<typeof part{index}>") } else { format!("typeof part{index}") });
     }
     source.push_str(if factory { "  });\n}\n" } else { "});\n" });
-    files.insert(path.to_path_buf(), source);
+    let combined = if types.is_empty() { "{}".into() } else { types.join(" & ") };
+    if factory {
+        declarations.push_str(&format!(
+            "import type {{ Executor }} from '{}';\nexport declare function createMembers(execute: Executor): {combined};\n",
+            import_path(path, Path::new("lib/collection.js"))
+        ));
+    } else {
+        declarations.push_str(&format!("export declare const operations: Readonly<{combined}>;\n"));
+    }
+    insert(files, path, source, declarations);
 }
 
 pub(super) fn exports(files: &mut Files, directory: &Path, mut parts: Vec<PathBuf>) -> Vec<PathBuf> {
@@ -61,9 +69,9 @@ pub(super) fn exports(files: &mut Files, directory: &Path, mut parts: Vec<PathBu
             .chunks(GROUP_SIZE)
             .enumerate()
             .map(|(index, children)| {
-                let path = directory.join(format!("exports-{level}-{index}.ts"));
-                let source = children.iter().map(|part| format!("export * from '{}';\n", import_path(&path, part))).collect();
-                files.insert(path.clone(), source);
+                let path = directory.join(format!("exports-{level}-{index}.js"));
+                let source: String = children.iter().map(|part| format!("export * from '{}';\n", import_path(&path, part))).collect();
+                insert(files, &path, source.clone(), source);
                 path
             })
             .collect();

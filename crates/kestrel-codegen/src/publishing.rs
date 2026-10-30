@@ -19,10 +19,10 @@ struct Manifest {
 pub(crate) fn validate_path(path: &Path) -> Result<()> {
     if path.as_os_str().is_empty()
         || !path.components().all(|part| matches!(part, Component::Normal(_)))
-        || path.extension().is_none_or(|extension| extension != "ts")
+        || path.extension().is_none_or(|extension| extension != "ts" && extension != "js")
         || path.to_string_lossy().contains(['\\', ':'])
     {
-        bail!("SDK files must use relative .ts paths without traversal: {}", path.display());
+        bail!("SDK files must use relative .js or .d.ts paths without traversal: {}", path.display());
     }
     Ok(())
 }

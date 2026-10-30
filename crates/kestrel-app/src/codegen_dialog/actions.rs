@@ -10,7 +10,7 @@ impl CodegenDialog {
             self.choose_directory(window, cx);
             return;
         }
-        let suggested = if self.output.archive { "sdk.zip" } else { "client.ts" };
+        let suggested = if self.output.archive { "sdk.zip" } else { "client.js" };
         let picked = cx.prompt_for_new_path(self.source.parent().unwrap_or(&self.source), Some(suggested));
         cx.spawn_in(window, async move |view, cx| match picked.await {
             Ok(Ok(Some(destination))) => view
