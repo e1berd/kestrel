@@ -7,6 +7,7 @@ use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
 use gpui_component::{Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit_assets::IconName;
 
+use super::variable_saving::SaveMode;
 use super::{METHODS, RequestTab};
 use crate::appearance::{self, MONO_FONT, dp};
 use crate::ui::{ReportUnlessGone as _, method_color};
@@ -63,19 +64,55 @@ impl RequestTab {
     fn render_save_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
         h_flex()
-            .id("save")
             .h(rems(2.8))
-            .px(dp(14.))
-            .gap(dp(7.))
             .items_center()
             .rounded(dp(12.))
-            .cursor_pointer()
-            .font_weight(FontWeight::MEDIUM)
-            .text_color(if self.dirty { palette.text } else { palette.faint })
-            .hover(|el| el.bg(palette.hover).text_color(palette.text))
-            .when(self.dirty, |el| el.child(div().size(dp(6.)).rounded_full().bg(palette.accent)))
-            .child("Save")
-            .on_click(cx.listener(|tab, _, window, cx| tab.save(window, cx)))
+            .border_1()
+            .border_color(palette.border)
+            .child(
+                h_flex()
+                    .id("save")
+                    .h_full()
+                    .pl(dp(14.))
+                    .pr(dp(10.))
+                    .gap(dp(7.))
+                    .items_center()
+                    .rounded_l(dp(11.))
+                    .cursor_pointer()
+                    .font_weight(FontWeight::MEDIUM)
+                    .text_color(if self.dirty { palette.text } else { palette.faint })
+                    .hover(|el| el.bg(palette.hover).text_color(palette.text))
+                    .when(self.dirty, |el| el.child(div().size(dp(6.)).rounded_full().bg(palette.accent)))
+                    .child("Save")
+                    .on_click(cx.listener(|tab, _, window, cx| tab.save(window, cx))),
+            )
+            .child(self.render_save_mode_picker(cx))
+    }
+
+    fn render_save_mode_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        let has_pending = !self.pending_variables.is_empty();
+        let tab = cx.entity().downgrade();
+        div().h_full().flex().items_center().border_l_1().border_color(palette.border).child(
+            Button::new("save-mode")
+                .ghost()
+                .h_full()
+                .px(dp(8.))
+                .rounded_r(dp(11.))
+                .child(Icon::new(gpui_component::IconName::ChevronDown).xsmall().text_color(palette.faint))
+                .dropdown_menu(move |menu, _, _| {
+                    let modes = [
+                        ("Save variables to the environment", SaveMode::Environment),
+                        ("Save variables to this request only", SaveMode::RequestOnly),
+                    ];
+                    modes.into_iter().fold(menu, |menu, (label, mode)| {
+                        let tab = tab.clone();
+                        menu.item(PopupMenuItem::new(label).disabled(!has_pending).on_click(move |_, window, cx| {
+                            tab.update(cx, |tab, cx| tab.save_with(mode, window, cx)).report_unless_gone("save a request");
+                        }))
+                    })
+                }),
+        )
     }
 
     fn render_method_picker(&self, cx: &mut Context<Self>) -> impl IntoElement {

@@ -1,13 +1,31 @@
+use std::cell::Cell;
 use std::rc::Rc;
 
-use gpui::{App, AppContext as _, IntoElement as _, ParentElement as _, SharedString, Styled as _, Window};
+use gpui::{App, AppContext as _, Entity, Focusable as _, IntoElement as _, ParentElement as _, SharedString, Styled as _, Window};
 use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::dialog::Dialog;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{WindowExt as _, h_flex};
 
 use crate::appearance::dp;
 
 type Submit = Rc<dyn Fn(String, &mut Window, &mut App)>;
+
+pub fn open_dialog_focusing(
+    window: &mut Window,
+    cx: &mut App,
+    input: &Entity<InputState>,
+    build: impl Fn(Dialog, &mut Window, &mut App) -> Dialog + 'static,
+) {
+    let input = input.clone();
+    let focus_pending = Cell::new(true);
+    window.open_dialog(cx, move |dialog, window, cx| {
+        if focus_pending.replace(false) {
+            input.focus_handle(cx).focus(window, cx);
+        }
+        build(dialog, window, cx)
+    });
+}
 
 pub fn ask_text(
     window: &mut Window,
@@ -20,7 +38,6 @@ pub fn ask_text(
     let placeholder = placeholder.into();
     let value = value.into();
     let input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder).default_value(value));
-    input.update(cx, |input, cx| input.focus(window, cx));
     let on_submit: Submit = Rc::new(on_submit);
     let submit = {
         let input = input.clone();
@@ -43,7 +60,7 @@ pub fn ask_text(
         })
         .detach();
     let title: SharedString = title.into();
-    window.open_dialog(cx, move |dialog, _, _| {
+    open_dialog_focusing(window, cx, &input.clone(), move |dialog, _, _| {
         let submit = submit.clone();
         dialog.title(title.clone()).w(dp(460.)).child(Input::new(&input)).child(
             h_flex()

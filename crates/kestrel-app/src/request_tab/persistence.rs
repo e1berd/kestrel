@@ -4,6 +4,7 @@ use gpui_component::input::InputEvent;
 use kestrel_core::format::Body;
 use kestrel_core::report::report_error;
 
+use super::variable_saving::SaveMode;
 use super::{RequestTab, TabEvent, code_editor, language_of};
 
 impl RequestTab {
@@ -18,6 +19,10 @@ impl RequestTab {
     }
 
     pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.save_with(SaveMode::Auto, window, cx);
+    }
+
+    pub(super) fn save_with(&mut self, mode: SaveMode, window: &mut Window, cx: &mut Context<Self>) {
         if self.project.read(cx).tree_move_pending {
             window.push_notification(
                 gpui_component::notification::Notification::info("Moving collection items; save again in a moment."),
@@ -25,6 +30,7 @@ impl RequestTab {
             );
             return;
         }
+        let Some(promotion) = self.promote_pending_variables(mode, window, cx) else { return };
         self.doc.data = self.build_file(cx);
         match self.doc.save() {
             Ok(()) => {
@@ -33,6 +39,7 @@ impl RequestTab {
                 self.dirty = false;
                 self.changed_on_disk = false;
                 cx.emit(TabEvent::Changed);
+                promotion.announce(window, cx);
             }
             Err(error) => {
                 report_error("save a request", &error);
@@ -49,6 +56,7 @@ impl RequestTab {
             self.doc.revert();
         }
         self.load_inputs(window, cx);
+        self.pending_variables.clear();
         self.dirty = false;
         self.changed_on_disk = false;
         cx.emit(TabEvent::Changed);

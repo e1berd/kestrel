@@ -19,6 +19,7 @@ mod sending;
 mod url_bar;
 mod variable_marks;
 mod variable_popup;
+mod variable_saving;
 
 const METHODS: [&str; 8] = ["GET", "QUERY", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const BODY_KINDS: [(&str, &str); 7] = [
@@ -108,6 +109,7 @@ pub struct RequestTab {
     missing_path_params: Vec<String>,
     token_status: Option<String>,
     variable_popup: Option<variable_popup::VariablePopup>,
+    pending_variables: Vec<String>,
     editor_marks: Vec<(gpui::EntityId, TextDecorationCollection)>,
     _subscriptions: Vec<Subscription>,
 }
@@ -174,6 +176,7 @@ impl RequestTab {
             missing_path_params: Vec::new(),
             token_status: None,
             variable_popup: None,
+            pending_variables: Vec::new(),
             editor_marks: Vec::new(),
             _subscriptions: Vec::new(),
         };

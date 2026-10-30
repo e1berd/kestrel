@@ -15,8 +15,8 @@ use std::path::PathBuf;
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use gpui::{
-    AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Subscription, Window,
-    actions, div, rems,
+    AnyElement, Context, Entity, FocusHandle, InteractiveElement as _, IntoElement, MouseMoveEvent, ParentElement as _, Render,
+    Styled as _, Subscription, Window, actions, div, rems,
 };
 use gpui_component::{ActiveTheme as _, TitleBar, h_flex, v_flex};
 
@@ -53,6 +53,7 @@ pub struct Workspace {
     active: usize,
     interact: GuiInteract,
     opening: HashSet<PathBuf>,
+    focus_handle: FocusHandle,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -69,7 +70,14 @@ impl Workspace {
         .detach();
         let subscriptions = vec![cx.observe_window_appearance(window, |_, window, cx| appearance::follow_system_appearance(window, cx))];
         cx.defer_in(window, move |workspace, window, cx| workspace.restore(initial, window, cx));
-        Self { views: Vec::new(), active: 0, interact: GuiInteract { prompts }, opening: HashSet::new(), _subscriptions: subscriptions }
+        Self {
+            views: Vec::new(),
+            active: 0,
+            interact: GuiInteract { prompts },
+            opening: HashSet::new(),
+            focus_handle: cx.focus_handle(),
+            _subscriptions: subscriptions,
+        }
     }
 
     fn activate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -138,10 +146,19 @@ impl Workspace {
 }
 
 impl Render for Workspace {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if window.focused(cx).is_none() {
+            cx.defer_in(window, |workspace, window, cx| window.focus(&workspace.focus_handle, cx));
+        }
         v_flex()
             .size_full()
             .key_context("Workspace")
+            .track_focus(&self.focus_handle)
+            .on_mouse_move(cx.listener(|_, event: &MouseMoveEvent, window, cx| {
+                if event.pressed_button.is_none() {
+                    cx.stop_active_drag(window);
+                }
+            }))
             .on_action(cx.listener(|workspace, _: &SendRequest, window, cx| {
                 if let Some(tab) = workspace.active_request(cx) {
                     tab.update(cx, |tab, cx| tab.send(window, cx));

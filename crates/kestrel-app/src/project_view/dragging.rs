@@ -46,7 +46,7 @@ impl Render for TreeDrag {
 
 impl ProjectView {
     pub(super) fn render_collection_drop_label(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        self.render_drop_zone(MoveTarget::Inside(self.root(cx)), cx)
+        self.render_drop_zone(MoveTarget::Inside(self.root(cx)), "header", cx)
             .id("collection-root-drop")
             .rounded(dp(6.))
             .child(eyebrow("Requests", cx))
@@ -63,11 +63,11 @@ impl ProjectView {
         div()
             .absolute()
             .inset_0()
-            .child(self.render_drop_zone(MoveTarget::Before(path.clone()), cx).absolute().top_0().h(relative(edge)))
+            .child(self.render_drop_zone(MoveTarget::Before(path.clone()), "row", cx).absolute().top_0().h(relative(edge)))
             .when(is_folder, |element| {
                 let hovered = path.clone();
                 element.child(
-                    self.render_drop_zone(MoveTarget::Inside(path.clone()), cx)
+                    self.render_drop_zone(MoveTarget::Inside(path.clone()), "row", cx)
                         .absolute()
                         .top(relative(edge))
                         .h(relative(1. - 2. * edge))
@@ -79,7 +79,9 @@ impl ProjectView {
                         .text_xs()
                         .text_color(palette.accent)
                         .opacity(0.)
-                        .drag_over::<TreeDrag>(|style, _, _, _| style.opacity(1.))
+                        .drag_over::<TreeDrag>(move |style, _, _, _| {
+                            style.opacity(1.).bg(palette.raised).border_1().border_color(palette.accent)
+                        })
                         .child(div().flex_1().min_w_0().truncate().child(name.to_owned()))
                         .child(Icon::new(IconName::FolderInput).size(dp(12.)))
                         .child("Move inside")
@@ -88,28 +90,38 @@ impl ProjectView {
                         })),
                 )
             })
-            .child(self.render_drop_zone(MoveTarget::After(path), cx).absolute().bottom_0().h(relative(edge)))
+            .child(self.render_drop_zone(MoveTarget::After(path), "row", cx).absolute().bottom_0().h(relative(edge)))
     }
 
     pub(super) fn render_root_drop_zone(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
-        self.render_drop_zone(MoveTarget::Inside(self.root(cx)), cx)
-            .h(rems(2.))
-            .flex_none()
-            .rounded(dp(8.))
-            .when(cx.has_active_drag(), |element| {
-                element.flex().items_center().justify_center().text_xs().text_color(palette.muted).child("Move to collection root")
-            })
+        self.render_drop_zone(MoveTarget::Inside(self.root(cx)), "footer", cx).h(rems(2.4)).flex_none().rounded(dp(8.)).when(
+            cx.has_active_drag(),
+            |element| {
+                element
+                    .flex()
+                    .items_center()
+                    .justify_center()
+                    .gap(dp(6.))
+                    .border_1()
+                    .border_dashed()
+                    .border_color(palette.border)
+                    .text_xs()
+                    .text_color(palette.muted)
+                    .child(Icon::new(IconName::FolderInput).size(dp(12.)))
+                    .child("Move to collection root")
+            },
+        )
     }
 
-    fn render_drop_zone(&self, target: MoveTarget, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
+    fn render_drop_zone(&self, target: MoveTarget, zone: &'static str, cx: &mut Context<Self>) -> gpui::Stateful<Div> {
         let view = cx.entity().downgrade();
         let drop_target = target.clone();
         let palette = appearance::palette(cx);
         let before = matches!(target, MoveTarget::Before(_));
         let after = matches!(target, MoveTarget::After(_));
         div()
-            .id(ElementId::Name(format!("drop-{target:?}").into()))
+            .id(ElementId::Name(format!("drop-{target:?}-{zone}").into()))
             .w_full()
             .can_drop(move |value, _, cx| {
                 let Some(drag) = value.downcast_ref::<TreeDrag>() else { return false };
@@ -123,7 +135,7 @@ impl ProjectView {
                 } else if after {
                     style.border_b_2().border_color(palette.accent)
                 } else {
-                    style.bg(palette.selection)
+                    style.bg(palette.selection).border_color(palette.accent).text_color(palette.accent)
                 }
             })
             .on_drop(cx.listener(move |view, drag: &TreeDrag, window, cx| {

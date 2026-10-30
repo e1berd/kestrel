@@ -7,6 +7,7 @@ use gpui_component::input::{Input, InputState};
 use gpui_component::{WindowExt as _, h_flex, v_flex};
 
 use crate::appearance::dp;
+use crate::dialogs::open_dialog_focusing;
 use crate::interact::PastePrompt;
 use crate::ui::hint;
 
@@ -17,7 +18,8 @@ redirect URIs and use it as the callback URL: Kestrel then catches the redirect 
 pub fn ask_for_redirect(prompt: PastePrompt, window: &mut Window, cx: &mut App) {
     let input = cx.new(|cx| InputState::new(window, cx).placeholder(format!("{}?code=…", prompt.callback)));
     let reply = Rc::new(RefCell::new(Some(prompt.reply)));
-    window.open_dialog(cx, move |dialog, _, cx| {
+    let focused = input.clone();
+    open_dialog_focusing(window, cx, &focused, move |dialog, _, cx| {
         let input = input.clone();
         let reply = reply.clone();
         dialog
