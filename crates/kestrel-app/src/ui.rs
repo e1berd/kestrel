@@ -5,6 +5,7 @@ use gpui::{
     AnyElement, App, Div, ElementId, Entity, FontWeight, Hsla, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
     StatefulInteractiveElement as _, Styled as _, Window, div, rems,
 };
+use gpui_component::button::Button;
 use gpui_component::input::{Input, InputState};
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use kestrel_core::report::report_error;
@@ -199,6 +200,15 @@ pub fn format_duration(elapsed: Duration) -> String {
 
 pub fn hint(text: &str, cx: &App) -> Div {
     div().text_xs().text_color(appearance::palette(cx).faint).child(text.to_string())
+}
+
+pub fn error_message(id: &'static str, error: &str, cx: &App) -> Div {
+    let text = error.to_string();
+    v_flex().gap(dp(8.)).child(div().text_color(appearance::palette(cx).danger).child(text.clone())).child(h_flex().child(
+        Button::new(id).label("Copy error").on_click(move |_, _, cx| {
+            cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.clone()));
+        }),
+    ))
 }
 
 pub fn eyebrow(text: &str, cx: &App) -> Div {

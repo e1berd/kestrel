@@ -2,6 +2,7 @@ mod dragging;
 mod empty_state;
 mod openapi_sync;
 mod sidebar;
+mod sidebar_state;
 mod tab_strip;
 mod tree_actions;
 
@@ -11,12 +12,13 @@ use std::path::{Path, PathBuf};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, App, AppContext as _, Context, Entity, EventEmitter, IntoElement, ParentElement as _, Render, Styled as _, Subscription,
-    Window, div,
+    Task, Window, div,
 };
 use gpui_component::input::{InputEvent, InputState};
 use gpui_component::{ResizableState, WindowExt as _, h_resizable, resizable_panel, v_flex};
 
 use crate::appearance::{self, dp};
+use crate::collection_tree::SidebarTree;
 use crate::dialogs::confirm;
 use crate::project::{Project, ProjectEvent};
 use crate::request_tab::{RequestTab, TabEvent};
@@ -33,6 +35,10 @@ pub struct ProjectView {
     expanded: HashSet<PathBuf>,
     filter: Entity<InputState>,
     layout: Entity<ResizableState>,
+    tree_scroll: gpui::UniformListScrollHandle,
+    sidebar: SidebarTree,
+    filter_task: Option<Task<()>>,
+    filtering: bool,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -41,10 +47,11 @@ impl EventEmitter<ProjectViewEvent> for ProjectView {}
 impl ProjectView {
     pub fn new(project: Entity<Project>, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let filter = cx.new(|cx| InputState::new(window, cx).placeholder("Filter requests"));
+        let sidebar = SidebarTree::new(project.read(cx).tree.clone(), &HashSet::new());
         let subscriptions = vec![
-            cx.subscribe(&filter, |_, _, event: &InputEvent, cx| {
+            cx.subscribe(&filter, |view, _, event: &InputEvent, cx| {
                 if matches!(event, InputEvent::Change) {
-                    cx.notify();
+                    view.schedule_filter(cx);
                 }
             }),
             cx.subscribe_in(&project, window, |view, _, event: &ProjectEvent, _, cx| {
@@ -62,6 +69,10 @@ impl ProjectView {
             expanded: HashSet::new(),
             filter,
             layout: cx.new(|_| ResizableState::default()),
+            tree_scroll: Default::default(),
+            sidebar,
+            filter_task: None,
+            filtering: false,
             _subscriptions: subscriptions,
         }
     }
@@ -132,6 +143,9 @@ impl ProjectView {
     fn expand_ancestors(&mut self, path: &Path, cx: &App) {
         let folders: Vec<PathBuf> = self.project.read(cx).collection.ancestors(path).iter().map(|folder| folder.dir.clone()).collect();
         self.expanded.extend(folders);
+        if !self.sidebar.filtered {
+            self.sidebar.show_expanded(&self.expanded);
+        }
     }
 
     fn activate_tab(&mut self, index: usize, cx: &mut Context<Self>) {
@@ -161,6 +175,7 @@ impl ProjectView {
     }
 
     fn notify_error(window: &mut Window, cx: &mut App, error: anyhow::Error) {
+        kestrel_core::report::report_error("edit the collection", &error);
         window.push_notification(gpui_component::notification::Notification::error(format!("{error:#}")), cx);
     }
 
@@ -192,6 +207,7 @@ impl ProjectView {
 
 impl Render for ProjectView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.refresh_sidebar(cx);
         h_resizable("project")
             .with_state(&self.layout)
             .child(resizable_panel().size(dp(276.)).size_range(dp(180.)..dp(640.)).child(self.render_sidebar(cx)))

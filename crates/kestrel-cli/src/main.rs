@@ -20,6 +20,7 @@ use args::{Cli, Command};
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
+        Command::Mcp { collection } => kestrel_mcp::serve(&collection).map(|_| true),
         Command::Codegen { collection, out, language: _, single_file, archive, overwrite } => {
             codegen::generate(&collection, &out, kestrel_codegen::OutputOptions { single_file, archive }, overwrite).map(|_| true)
         }

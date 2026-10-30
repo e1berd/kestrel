@@ -149,7 +149,6 @@ impl Render for ImportDialog {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let is_openapi =
             self.prepared.as_ref().map(|prepared| prepared.preview.format) == Some(Format::OpenApi) || self.format == Some(Format::OpenApi);
-        let palette = appearance::palette(cx);
         v_flex()
             .gap(dp(18.))
             .when(self.busy, |element| element.child(crate::transfer_progress::render(&self.progress, cx)))
@@ -165,7 +164,7 @@ impl Render for ImportDialog {
                     .child(self.render_preview(cx))
                     .child(self.render_destination(cx))
                     .when(self.prepared.is_some(), |element| element.child(self.render_open_option(cx)))
-                    .children(self.error.as_ref().map(|error| div().text_size(rems(0.85)).text_color(palette.danger).child(error.clone()))),
+                    .children(self.error.as_ref().map(|error| crate::ui::error_message("import-copy-error", error, cx))),
             )
             .child(self.render_footer(cx))
     }

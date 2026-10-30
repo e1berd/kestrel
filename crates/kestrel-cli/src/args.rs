@@ -4,7 +4,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "kestrel-cli",
+    name = "kestrelcli",
     version,
     about = "Kestrel from the terminal: run requests, import, export, generate SDKs and sync collections"
 )]
@@ -15,6 +15,11 @@ pub(super) struct Cli {
 
 #[derive(Subcommand)]
 pub(super) enum Command {
+    #[command(about = "Serve a collection over MCP on stdin/stdout")]
+    Mcp {
+        #[arg(default_value = ".")]
+        collection: PathBuf,
+    },
     Codegen {
         #[arg(default_value = ".")]
         collection: PathBuf,

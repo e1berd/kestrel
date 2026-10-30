@@ -61,7 +61,7 @@ def main():
     parser.add_argument("--payload-bytes", type=int, default=32768)
     parser.add_argument("--source-format", choices=["json", "yaml", "apidog"], default="json")
     parser.add_argument("--max-rss-mib", type=int, default=256)
-    parser.add_argument("--binary", type=Path, default=Path("target/debug/kestrel-cli"))
+    parser.add_argument("--binary", type=Path, default=Path("target/debug/kestrelcli"))
     arguments = parser.parse_args()
     if arguments.size_mib < 1 or arguments.payload_bytes < 1:
         parser.error("sizes must be positive")

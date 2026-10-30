@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "kestrel-cli"
+name = "kestrelcli"
 path = "src/main.rs"
 
 [dependencies]
@@ -14,6 +14,7 @@ kestrel-core.workspace = true
 kestrel-openapi.workspace = true
 kestrel-import.workspace = true
 kestrel-codegen.workspace = true
+kestrel-mcp.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 futures.workspace = true

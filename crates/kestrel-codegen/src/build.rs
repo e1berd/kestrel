@@ -3,13 +3,14 @@ use kestrel_core::format::Body;
 use kestrel_core::transfer::{Progress, Unit};
 use kestrel_core::{Collection, Plan};
 
+use crate::assignment::Candidate;
 use crate::naming::validate;
-use crate::{Operation, Resource, Transport, collections, route, security, services};
+use crate::{Operation, Resource, Transport, assignment, collections, route, security, services};
 
 pub(crate) fn resources(collection: &Collection, progress: &Progress) -> Result<(Resource, Vec<String>)> {
     let requests = collection.requests();
     progress.start("Building SDK resources", Some(requests.len() as u64), Unit::Requests)?;
-    let mut root = Resource::default();
+    let mut candidates = Vec::new();
     let mut warnings = Vec::new();
     for request in requests {
         progress.check()?;
@@ -18,19 +19,21 @@ pub(crate) fn resources(collection: &Collection, progress: &Progress) -> Result<
             progress.advance(1)?;
             continue;
         }
-        let plan = Plan::new(collection, &request.doc.path, None)?;
-        add(&mut root, &plan, &mut warnings).with_context(|| format!("generate SDK method for {}", request.doc.path.display()))?;
+        let plan = Plan::with_file(collection, &request.doc.path, request.doc.data.clone(), None)?;
+        candidates
+            .push(operation(&plan, &mut warnings).with_context(|| format!("generate SDK method for {}", request.doc.path.display()))?);
         progress.advance(1)?;
     }
-    if root.resources.is_empty() {
+    if candidates.is_empty() {
         bail!("the collection has no HTTP requests to generate");
     }
+    let root = assignment::resources(candidates, &mut warnings)?;
     warnings.sort();
     warnings.dedup();
     Ok((root, warnings))
 }
 
-fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<()> {
+fn operation(plan: &Plan, warnings: &mut Vec<String>) -> Result<Candidate> {
     let http = plan.file.http.as_ref().expect("an HTTP request");
     let route = route::parse(&http.url)?;
     let method = if http.method.is_empty() { "GET".into() } else { http.method.to_ascii_uppercase() };
@@ -68,19 +71,8 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
         None => inferred,
     };
     validate(&name)?;
-    let mut node = root;
     for resource in &resource_path {
         validate(resource)?;
-        if node.methods.contains_key(resource) {
-            bail!("resource `{resource}` collides with a method; set extensions.kestrel.codegen.resource or method explicitly");
-        }
-        node = node.resources.entry(resource.clone()).or_default();
-    }
-    if node.resources.contains_key(&name) || node.methods.contains_key(&name) {
-        bail!(
-            "SDK name `{}.{name}` is already used; set extensions.kestrel.codegen.resource or method explicitly",
-            resource_path.join(".")
-        );
     }
     if !plan.file.scripts().is_empty() || plan.chain.iter().any(|(_, defaults)| !defaults.scripts.is_empty()) {
         warnings.push("Bruno scripts and tests are not executed in generated SDKs; reproduce their behavior in your application.".into());
@@ -144,11 +136,20 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
         body_kind: body_kind.into(),
         auth: security::authentication(plan, warnings)?,
     };
-    node.methods.insert(
+    Ok(Candidate {
+        resources: resource_path,
         name,
-        Operation { request: plan.name.clone(), path_parameters: route.parameters, query_parameters, body, collection, transport },
-    );
-    Ok(())
+        explicit: overrides.and_then(|value| value.get("method")).is_some(),
+        source: plan.path.clone(),
+        operation: Operation {
+            request: plan.name.clone(),
+            path_parameters: route.parameters,
+            query_parameters,
+            body,
+            collection,
+            transport,
+        },
+    })
 }
 
 fn body_type(body: Option<&Body>) -> Result<Option<String>> {

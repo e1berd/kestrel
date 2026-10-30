@@ -51,7 +51,7 @@ impl ProjectView {
         let placeholder = "../backend/openapi.json or https://…/openapi.json";
         ask_text(window, cx, "Where is the OpenAPI spec?", placeholder, "", move |source, window, cx| {
             view.update(cx, |view, cx| {
-                view.project.update(cx, |project, _| remember_spec(&mut project.collection, &source));
+                view.project.update(cx, |project, _| project.edit_collection(|collection| remember_spec(collection, &source)));
                 view.sync_openapi(window, cx);
             })
             .report_unless_gone("start an OpenAPI sync");

@@ -41,7 +41,7 @@ impl Directory {
     }
 
     pub fn cli(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_kestrel-cli"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_kestrelcli"));
         command.current_dir(&self.0).env("XDG_STATE_HOME", self.0.join("state")).env("NO_PROXY", "*");
         command
     }
@@ -54,7 +54,7 @@ impl Drop for Directory {
 }
 
 pub fn succeed(command: &mut Command) -> Output {
-    let output = command.output().expect("run kestrel-cli");
+    let output = command.output().expect("run kestrelcli");
     assert!(
         output.status.success(),
         "{command:?}\nstdout: {}\nstderr: {}",

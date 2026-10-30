@@ -10,16 +10,19 @@ use gpui_component::{ActiveTheme as _, Sizable as _, WindowExt as _, h_flex, v_f
 use kestrel_core::Document;
 use kestrel_core::collection::{ENVIRONMENTS_DIR, sanitize_file_name};
 use kestrel_core::format::EnvironmentFile;
+use kestrel_core::report::report_error;
 
 use crate::appearance::dp;
 use crate::kv_table::KvTable;
-use crate::project::Project;
+use crate::project::{Project, ProjectEvent};
 
 pub struct EnvEditor {
     project: Entity<Project>,
     selected: usize,
     table: Entity<KvTable>,
     new_name: Entity<InputState>,
+    select_after_reload: Option<String>,
+    _subscription: gpui::Subscription,
 }
 
 impl EnvEditor {
@@ -29,7 +32,16 @@ impl EnvEditor {
         let items = project.read(cx).collection.environments.get(selected).map(|e| e.doc.data.variables.clone()).unwrap_or_default();
         let table = cx.new(|cx| KvTable::new("env-vars", &items, window, cx).placeholders("Variable", "Value"));
         let new_name = cx.new(|cx| InputState::new(window, cx).placeholder("New environment name"));
-        Self { project, selected, table, new_name }
+        let subscription = cx.subscribe_in(&project, window, |editor, _, event: &ProjectEvent, window, cx| {
+            if matches!(event, ProjectEvent::Reloaded)
+                && let Some(name) = editor.select_after_reload.take()
+                && let Some(index) =
+                    editor.project.read(cx).collection.environments.iter().position(|environment| environment.name() == name)
+            {
+                editor.select(index, window, cx);
+            }
+        });
+        Self { project, selected, table, new_name, select_after_reload: None, _subscription: subscription }
     }
 
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -43,15 +55,20 @@ impl EnvEditor {
         let items = self.table.read(cx).items(cx);
         let index = self.selected;
         let result = self.project.update(cx, |project, cx| {
-            let Some(env) = project.collection.environments.get_mut(index) else { return Ok(()) };
-            env.doc.data.variables = items;
-            let result = env.doc.save();
+            let result = project.edit_collection(|collection| {
+                let Some(environment) = collection.environments.get_mut(index) else { return Ok(()) };
+                environment.doc.data.variables = items;
+                environment.doc.save()
+            });
             cx.notify();
             result
         });
         match result {
             Ok(()) => window.push_notification(Notification::success("Environment saved"), cx),
-            Err(e) => window.push_notification(Notification::error(format!("{e:#}")), cx),
+            Err(error) => {
+                report_error("edit collection environments", &error);
+                window.push_notification(Notification::error(format!("{error:#}")), cx);
+            }
         }
     }
 
@@ -61,28 +78,32 @@ impl EnvEditor {
             return;
         }
         let result = self.project.update(cx, |project, cx| {
-            let path = project.collection.root.join(ENVIRONMENTS_DIR).join(format!("{}.yml", sanitize_file_name(&name)));
-            if path.exists() {
-                return Err(anyhow::anyhow!("there is an environment called {name} already"));
-            }
-            let variables = project
-                .collection
-                .environments
-                .first()
-                .map(|e| {
-                    e.doc.data.variables.iter().map(|v| kestrel_core::format::KeyValue { value: String::new(), ..v.clone() }).collect()
-                })
-                .unwrap_or_default();
-            Document::new(path, EnvironmentFile { name: name.clone(), variables, ..Default::default() }, false).save()?;
+            project.edit_collection(|collection| {
+                let path = collection.root.join(ENVIRONMENTS_DIR).join(format!("{}.yml", sanitize_file_name(&name)));
+                if path.exists() {
+                    return Err(anyhow::anyhow!("there is an environment called {name} already"));
+                }
+                let variables = collection
+                    .environments
+                    .first()
+                    .map(|e| {
+                        e.doc.data.variables.iter().map(|v| kestrel_core::format::KeyValue { value: String::new(), ..v.clone() }).collect()
+                    })
+                    .unwrap_or_default();
+                Document::new(path, EnvironmentFile { name: name.clone(), variables, ..Default::default() }, false).save()
+            })?;
             project.reload(cx);
-            Ok(project.collection.environments.iter().position(|e| e.name() == name).unwrap_or(0))
+            anyhow::Ok(())
         });
         match result {
-            Ok(index) => {
-                self.new_name.update(cx, |i, cx| i.set_value("", window, cx));
-                self.select(index, window, cx);
+            Ok(()) => {
+                self.select_after_reload = Some(name);
+                self.new_name.update(cx, |input, cx| input.set_value("", window, cx));
             }
-            Err(e) => window.push_notification(Notification::error(format!("{e:#}")), cx),
+            Err(error) => {
+                report_error("edit collection environments", &error);
+                window.push_notification(Notification::error(format!("{error:#}")), cx);
+            }
         }
     }
 }

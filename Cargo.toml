@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/kestrel-core", "crates/kestrel-openapi", "crates/kestrel-import", "crates/kestrel-codegen", "crates/kestrel-cli", "crates/kestrel-app"]
+members = ["crates/kestrel-core", "crates/kestrel-openapi", "crates/kestrel-import", "crates/kestrel-codegen", "crates/kestrel-cli", "crates/kestrel-mcp", "crates/kestrel-app"]
 default-members = ["crates/kestrel-app"]
 
 [workspace.package]
@@ -15,6 +15,8 @@ kestrel-core = { path = "crates/kestrel-core" }
 kestrel-openapi = { path = "crates/kestrel-openapi" }
 kestrel-import = { path = "crates/kestrel-import" }
 kestrel-codegen = { path = "crates/kestrel-codegen" }
+kestrel-mcp = { path = "crates/kestrel-mcp" }
+rmcp = { version = "3.8.0", default-features = false, features = ["server", "macros", "transport-io"] }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

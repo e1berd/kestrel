@@ -39,6 +39,9 @@ impl Workspace {
         } else {
             bar = bar.child(div().flex_1());
         }
+        if !self.opening.is_empty() {
+            bar = bar.child("Opening collections…");
+        }
         bar.child(concat!("Kestrel ", env!("CARGO_PKG_VERSION"))).into_any_element()
     }
 }

@@ -3,20 +3,20 @@ use std::path::{Path, PathBuf};
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
     AnyElement, App, AppContext as _, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
-    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, rems,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, rems, uniform_list,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::Input;
 use gpui_component::menu::{ContextMenuExt as _, DropdownMenu as _, PopupMenu, PopupMenuItem};
 use gpui_component::{ActiveTheme as _, Icon, Sizable as _, h_flex, v_flex};
 use gpui_kit_assets::IconName;
-use kestrel_core::Item;
 
 use super::ProjectView;
 use super::dragging::TreeDrag;
 use crate::appearance::{self, dp};
 use crate::ui::{ReportUnlessGone as _, method_badge};
 
+#[derive(Clone)]
 struct Row {
     path: PathBuf,
     name: String,
@@ -32,9 +32,7 @@ impl ProjectView {
     pub(super) fn render_sidebar(&self, cx: &mut Context<Self>) -> AnyElement {
         let palette = appearance::palette(cx);
         let project = self.project.read(cx);
-        let filter = self.filter.read(cx).value().to_lowercase();
-        let mut rows = Vec::new();
-        self.collect_rows(&project.collection.items, 0, &filter, &mut rows);
+
         let active_path = self.active_tab().map(|tab| tab.read(cx).path.clone());
         let load_error = project.load_error.clone();
         v_flex()
@@ -49,14 +47,38 @@ impl ProjectView {
                     .px(dp(2.))
                     .child(Input::new(&self.filter).prefix(Icon::new(IconName::Search).small().text_color(palette.faint)).cleanable(true)),
             )
+            .when(self.filtering, |element| element.child(crate::ui::hint("Filtering requests…", cx)))
             .child(
-                div().id("tree").flex_1().min_h_0().overflow_y_scroll().pb_4().child(
-                    v_flex()
-                        .min_h_full()
-                        .gap(dp(1.))
-                        .children(rows.into_iter().map(|row| self.render_row(row, active_path.as_deref(), cx)))
-                        .child(self.render_root_drop_zone(cx)),
-                ),
+                v_flex()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_hidden()
+                    .child(
+                        uniform_list(
+                            "tree",
+                            self.sidebar.rows.len(),
+                            cx.processor(move |view, range: std::ops::Range<usize>, _, cx| {
+                                range
+                                    .filter_map(|index| {
+                                        let node = view.sidebar.node(index)?;
+                                        let row = Row {
+                                            path: node.path.to_path_buf(),
+                                            name: node.name.clone(),
+                                            method: node.method.clone(),
+                                            depth: node.depth,
+                                            is_open: view.sidebar.filtered || view.expanded.contains(node.path.as_ref()),
+                                            count: node.count,
+                                        };
+                                        Some(view.render_row(row, active_path.as_deref(), cx))
+                                    })
+                                    .collect()
+                            }),
+                        )
+                        .track_scroll(&self.tree_scroll)
+                        .flex_1()
+                        .min_h_0(),
+                    )
+                    .child(self.render_root_drop_zone(cx)),
             )
             .into_any_element()
     }
@@ -96,34 +118,6 @@ impl ProjectView {
                     .icon(Icon::new(IconName::Ellipsis))
                     .dropdown_menu(move |menu, _, _| collection_menu(menu, view.clone())),
             )
-    }
-
-    fn collect_rows(&self, items: &[Item], depth: usize, filter: &str, out: &mut Vec<Row>) {
-        for item in items {
-            match item {
-                Item::Folder(folder) => {
-                    let is_open = !filter.is_empty() || self.expanded.contains(&folder.dir);
-                    let mut inner = Vec::new();
-                    if is_open {
-                        self.collect_rows(&folder.children, depth + 1, filter, &mut inner);
-                    }
-                    if !filter.is_empty() && inner.is_empty() && !folder.name().to_lowercase().contains(filter) {
-                        continue;
-                    }
-                    let count = count_requests(&folder.children);
-                    out.push(Row { path: folder.dir.clone(), name: folder.name(), method: None, depth, is_open, count });
-                    out.extend(inner);
-                }
-                Item::Request(request) => {
-                    let name = request.name();
-                    let url = request.doc.data.http.as_ref().map(|http| http.url.to_lowercase()).unwrap_or_default();
-                    if !filter.is_empty() && !name.to_lowercase().contains(filter) && !url.contains(filter) {
-                        continue;
-                    }
-                    out.push(Row { path: request.doc.path.clone(), name, method: Some(request.method()), depth, is_open: false, count: 0 });
-                }
-            }
-        }
     }
 
     fn render_row(&self, row: Row, active: Option<&Path>, cx: &mut Context<Self>) -> AnyElement {
@@ -181,23 +175,6 @@ impl ProjectView {
             .context_menu(move |menu, _, _| row_menu(menu, view.clone(), menu_path.clone(), is_folder))
             .into_any_element()
     }
-
-    fn toggle_folder(&mut self, path: &Path, cx: &mut Context<Self>) {
-        if !self.expanded.remove(path) {
-            self.expanded.insert(path.to_path_buf());
-        }
-        cx.notify();
-    }
-}
-
-fn count_requests(items: &[Item]) -> usize {
-    items
-        .iter()
-        .map(|item| match item {
-            Item::Folder(folder) => count_requests(&folder.children),
-            Item::Request(_) => 1,
-        })
-        .sum()
 }
 
 fn row_menu(menu: PopupMenu, view: gpui::WeakEntity<ProjectView>, path: PathBuf, is_folder: bool) -> PopupMenu {

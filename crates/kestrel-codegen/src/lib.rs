@@ -1,3 +1,4 @@
+mod assignment;
 mod build;
 mod collections;
 mod naming;

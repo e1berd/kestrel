@@ -1,4 +1,5 @@
 mod command_palette;
+mod loading;
 mod rail;
 mod sign_in;
 mod status_bar;
@@ -8,22 +9,21 @@ pub use title_bar::shortcut;
 mod welcome;
 mod welcome_screen;
 
-use std::path::{Path, PathBuf};
+use std::collections::HashSet;
+use std::path::PathBuf;
 
 use futures::StreamExt as _;
 use futures::channel::mpsc;
 use gpui::{
-    AnyElement, AppContext as _, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _,
-    Subscription, Window, actions, div,
+    AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Subscription, Window,
+    actions, div,
 };
-use gpui_component::notification::Notification;
-use gpui_component::{ActiveTheme as _, TitleBar, WindowExt as _, h_flex, v_flex};
+use gpui_component::{ActiveTheme as _, TitleBar, h_flex, v_flex};
 
 use crate::appearance::{self, dp};
 use crate::dialogs::confirm;
 use crate::interact::{GuiInteract, PastePrompt};
 use crate::prefs::Prefs;
-use crate::project::Project;
 use crate::project_view::{ProjectView, ProjectViewEvent};
 use crate::request_tab::RequestTab;
 use crate::settings;
@@ -52,6 +52,7 @@ pub struct Workspace {
     views: Vec<Entity<ProjectView>>,
     active: usize,
     interact: GuiInteract,
+    opening: HashSet<PathBuf>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -67,61 +68,8 @@ impl Workspace {
         })
         .detach();
         let subscriptions = vec![cx.observe_window_appearance(window, |_, window, cx| appearance::follow_system_appearance(window, cx))];
-        let mut workspace = Self { views: Vec::new(), active: 0, interact: GuiInteract { prompts }, _subscriptions: subscriptions };
-        workspace.restore(initial, window, cx);
-        workspace
-    }
-
-    fn restore(&mut self, initial: Option<PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        let prefs = Prefs::load();
-        for root in prefs.open_projects.iter().filter(|root| root.join(kestrel_core::collection::COLLECTION_FILE).is_file()) {
-            self.open_collection(root, window, cx);
-        }
-        let focus = initial.clone().or(prefs.active_project);
-        if let Some(path) = focus {
-            self.open_collection(&path, window, cx);
-        }
-        if let Some(request) = initial.filter(|path| path.is_file()) {
-            self.open_request_file(&request, window, cx);
-        }
-    }
-
-    fn open_request_file(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
-        let Ok(path) = path.canonicalize() else { return };
-        self.with_view(cx, |view, cx| view.open_request(&path, window, cx));
-    }
-
-    pub fn open_collection(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(root) = kestrel_core::collection::find_root(path) else {
-            let message = format!("{} is not a collection: there is no opencollection.yml in it", path.display());
-            window.push_notification(Notification::error(message), cx);
-            return;
-        };
-        if let Some(index) = self.views.iter().position(|view| view.read(cx).root(cx) == root) {
-            self.activate(index, window, cx);
-            return;
-        }
-        match Project::open(&root, self.interact.clone(), cx) {
-            Ok(project) => {
-                let view = cx.new(|cx| ProjectView::new(project, window, cx));
-                self._subscriptions.push(cx.subscribe(&view, |_, _, _: &ProjectViewEvent, cx| cx.notify()));
-                self.views.push(view);
-                self.activate(self.views.len() - 1, window, cx);
-            }
-            Err(error) => window.push_notification(Notification::error(format!("{error:#}")), cx),
-        }
-    }
-
-    pub fn open_loaded_collection(&mut self, collection: kestrel_core::Collection, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.views.iter().position(|view| view.read(cx).root(cx) == collection.root) {
-            self.activate(index, window, cx);
-            return;
-        }
-        let project = Project::from_collection(collection, self.interact.clone(), cx);
-        let view = cx.new(|cx| ProjectView::new(project, window, cx));
-        self._subscriptions.push(cx.subscribe(&view, |_, _, _: &ProjectViewEvent, cx| cx.notify()));
-        self.views.push(view);
-        self.activate(self.views.len() - 1, window, cx);
+        cx.defer_in(window, move |workspace, window, cx| workspace.restore(initial, window, cx));
+        Self { views: Vec::new(), active: 0, interact: GuiInteract { prompts }, opening: HashSet::new(), _subscriptions: subscriptions }
     }
 
     fn activate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {

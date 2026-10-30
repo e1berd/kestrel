@@ -19,9 +19,9 @@ impl ProjectView {
         ask_text(window, cx, "New request", "Request name", "", move |name, window, cx| {
             let dir = dir.clone();
             view.update(cx, |view, cx| {
-                let created = view
-                    .project
-                    .update(cx, |project, _| project.collection.add_request(&dir, RequestFile::new_http(&name, "GET", "{{baseUrl}}/")));
+                let created = view.project.update(cx, |project, _| {
+                    project.edit_tree(|collection| collection.add_request(&dir, RequestFile::new_http(&name, "GET", "{{baseUrl}}/")))
+                });
                 match created {
                     Ok(path) => {
                         view.expanded.insert(dir.clone());
@@ -39,13 +39,15 @@ impl ProjectView {
         let view = cx.entity().downgrade();
         ask_text(window, cx, "New folder", "Folder name", "", move |name, window, cx| {
             let parent = parent.clone();
-            view.update(cx, |view, cx| match view.project.update(cx, |project, _| project.collection.add_folder(&parent, &name)) {
-                Ok(dir) => {
-                    view.expanded.insert(parent.clone());
-                    view.expanded.insert(dir);
-                    cx.notify();
+            view.update(cx, |view, cx| {
+                match view.project.update(cx, |project, _| project.edit_tree(|collection| collection.add_folder(&parent, &name))) {
+                    Ok(dir) => {
+                        view.expanded.insert(parent.clone());
+                        view.expanded.insert(dir);
+                        cx.notify();
+                    }
+                    Err(error) => Self::notify_error(window, cx, error),
                 }
-                Err(error) => Self::notify_error(window, cx, error),
             })
             .report_unless_gone("make a folder");
         });
@@ -56,9 +58,11 @@ impl ProjectView {
         let view = cx.entity().downgrade();
         ask_text(window, cx, "Rename", "Name", current, move |name, window, cx| {
             let path = path.clone();
-            view.update(cx, |view, cx| match view.project.update(cx, |project, _| project.collection.rename(&path, &name)) {
-                Ok(new_path) => view.reopen_moved_tabs(&path, &new_path, window, cx),
-                Err(error) => Self::notify_error(window, cx, error),
+            view.update(cx, |view, cx| {
+                match view.project.update(cx, |project, _| project.edit_tree(|collection| collection.rename(&path, &name))) {
+                    Ok(new_path) => view.reopen_moved_tabs(&path, &new_path, window, cx),
+                    Err(error) => Self::notify_error(window, cx, error),
+                }
             })
             .report_unless_gone("rename an item");
         });
@@ -81,12 +85,14 @@ impl ProjectView {
 
     pub fn duplicate(&mut self, path: PathBuf, window: &mut Window, cx: &mut Context<Self>) {
         let duplicated = self.project.update(cx, |project, _| {
-            let request = project.collection.request(&path).context("the request is gone")?;
-            let mut file = request.doc.data.clone();
-            file.info.name = format!("{} copy", request.name());
-            file.info.seq = None;
-            let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
-            project.collection.add_request(&dir, file)
+            project.edit_tree(|collection| {
+                let request = collection.request(&path).context("the request is gone")?;
+                let mut file = request.doc.data.clone();
+                file.info.name = format!("{} copy", request.name());
+                file.info.seq = None;
+                let dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
+                collection.add_request(&dir, file)
+            })
         });
         match duplicated {
             Ok(new_path) => self.open_request(&new_path, window, cx),
@@ -104,9 +110,11 @@ impl ProjectView {
         let description = "Its files are deleted from disk. Git still has them if they were committed.";
         confirm(window, cx, format!("Delete {what}?"), description, "Delete", move |window, cx| {
             let path = path.clone();
-            view.update(cx, |view, cx| match view.project.update(cx, |project, _| project.collection.remove(&path)) {
-                Ok(()) => view.remove_tabs_under(&path, cx),
-                Err(error) => Self::notify_error(window, cx, error),
+            view.update(cx, |view, cx| {
+                match view.project.update(cx, |project, _| project.edit_tree(|collection| collection.remove(&path))) {
+                    Ok(()) => view.remove_tabs_under(&path, cx),
+                    Err(error) => Self::notify_error(window, cx, error),
+                }
             })
             .report_unless_gone("delete an item");
         });

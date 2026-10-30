@@ -164,7 +164,7 @@ extensions:
       method: markRead
 ```
 
-Both overrides are optional. Identifiers must use ASCII letters, digits, `_` or `$` and cannot start with a digit. Unsafe property names and method/resource collisions produce an error that names the source request. The generator never silently overwrites one operation with another. Duplicate saved examples require distinct method names. Generation is deterministic and does not modify collection files; publishing uses a temporary file so conversion failures leave an existing SDK intact.
+Both overrides are optional. Identifiers must use ASCII letters, digits, `_` or `$` and cannot start with a digit. Unsafe property names and conflicting explicit method names produce an error that names the source request. When inferred names collide with another operation or a nested resource, the generator appends the request name and, if needed, a numeric suffix, and reports a warning. Explicit method names take priority. Every saved HTTP request remains in the SDK, including login requests and alternate examples of the same endpoint. Generation is deterministic and does not modify collection files; publishing uses a temporary file so conversion failures leave an existing SDK intact.
 
 `service` selects a separate origin/authentication profile. For identical resource paths in multiple services, set distinct `resource` namespaces, for example `alpha.users` and `beta.users`, together with `service: alpha` and `service: beta`. Different origins cannot silently share a service name.
 

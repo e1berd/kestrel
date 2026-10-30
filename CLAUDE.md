@@ -14,10 +14,11 @@ Kestrel — бесплатный open-source API-клиент на GPUI, аль�
 |---|---|
 | `crates/kestrel-core` | Формат файлов, коллекция, окружения, переменные, отправка запросов, OAuth2, JS-скрипты, `report_error` |
 | `crates/kestrel-openapi` | OpenAPI 3 → коллекция: импорт и повторный синк без потери правок |
-| `crates/kestrel-cli` | `kestrel-cli`: запуск коллекций в терминале и CI, импорт и синк |
+| `crates/kestrel-cli` | `kestrelcli`: запуск коллекций в терминале и CI, импорт и синк |
+| `crates/kestrel-mcp` | `kestrel-mcp`: MCP-сервер по stdio для коллекций, редактирования и запуска запросов |
 | `crates/kestrel-app` | Приложение `kestrel` на GPUI; пакет по умолчанию: `cargo run` запускает его |
 
-`cargo cli …` — алиас для `kestrel-cli` (`.cargo/config.toml`). `cargo build` и `cargo test` без `--workspace` трогают только приложение.
+`cargo cli …` — алиас для `kestrelcli`, `cargo mcp …` — для `kestrel-mcp` (`.cargo/config.toml`). `cargo build` и `cargo test` без `--workspace` трогают только приложение.
 
 В `kestrel-app`:
 - `appearance/` — дизайн-система: палитры, разворачивание в тему gpui-component, масштаб (`dp()`), шрифты, режим для слабовидящих;
@@ -141,7 +142,7 @@ Kestrel — бесплатный open-source API-клиент на GPUI, аль�
 
 ```bash
 cargo +1.92.0 fmt --all --check
-cargo +1.92.0 clippy -p kestrel-core -p kestrel-openapi -p kestrel-cli --all-targets
+cargo +1.92.0 clippy -p kestrel-core -p kestrel-openapi -p kestrel-cli -p kestrel-mcp --all-targets
 cargo test --workspace
 KESTREL_COMPAT_DIR=/путь/к/коллекции cargo test -p kestrel-core --test compat
 ```

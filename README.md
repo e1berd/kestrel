@@ -16,7 +16,8 @@ Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the Open
 - **OpenAPI sync**: sync an imported collection as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
 - **Several projects open at once**, each with its own tabs; switch from the rail on the left or with Ctrl+Shift+[ / ].
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
-- **CLI** for terminals and CI: `kestrel-cli run`, `import`, `export`, `codegen`, `sync`.
+- **CLI** for terminals and CI: `kestrelcli run`, `import`, `export`, `codegen`, `sync`.
+- **MCP server**: let an AI client inspect and edit saved requests, select environments, send requests and run collections with scripts and tests.
 
 ## Build
 
@@ -26,9 +27,9 @@ Rust stable (see `rust-toolchain.toml`). On Linux GPUI needs Vulkan, X11/Wayland
 cargo run --release
 ```
 
-On Linux, `packaging/linux/install.sh` builds a release, puts `kestrel` in `~/.local/bin` and adds the app with its icon to the application menu.
+On Linux, `packaging/linux/install.sh` builds a release, puts `kestrel`, `kestrelcli` and `kestrel-mcp` in `~/.local/bin` and adds the app with its icon to the application menu.
 
-`cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrel-cli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds both into `target/release/`.
+`cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrelcli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds all three executables into `target/release/`. The Rust package remains `kestrel-cli`; its executable is named `kestrelcli`.
 
 ## Use
 
@@ -37,15 +38,15 @@ kestrel path/to/collection
 ```
 
 ```bash
-kestrel-cli run path/to/collection --env local
+kestrelcli run path/to/collection --env local
 ```
 
 ```bash
-kestrel-cli import openapi.json --out my-api
+kestrelcli import openapi.json --out my-api
 ```
 
 ```bash
-kestrel-cli import project.apidog.json --out my-api --format apidog
+kestrelcli import project.apidog.json --out my-api --format apidog
 ```
 
 Import formats are detected automatically; `--format openapi` or `--format apidog` selects one explicitly. OpenAPI imports support `--group-by tags` (default) or `--group-by path`, and JSON Pointer `$ref` references to local files or HTTP(S) documents. The desktop **Import collection…** dialog offers the same formats and grouping options.
@@ -57,23 +58,70 @@ Apidog imports preserve HTTP requests, nested folders, descriptions, parameters,
 Choose **Export collection…** from the collection menu or command palette, or run:
 
 ```bash
-kestrel-cli export path/to/collection --out openapi.yaml --format openapi32 --encoding yaml
-kestrel-cli export path/to/collection --out project.apidog.json --format apidog
+kestrelcli export path/to/collection --out openapi.yaml --format openapi32 --encoding yaml
+kestrelcli export path/to/collection --out project.apidog.json --format apidog
 ```
 
 Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apidog`. Use `--overwrite` to replace an existing export file. The desktop and terminal show actual progress for reading, conversion and writing. Transfers use temporary disk storage; the [transfer guide](crates/kestrel-import/README.md) documents memory behavior, cancellation, format limitations and reproducible large-file checks.
 
 ```bash
-kestrel-cli sync path/to/collection
+kestrelcli sync path/to/collection
 ```
 
 Choose **Generate SDK…** from the collection menu or command palette, or run:
 
 ```bash
-kestrel-cli codegen path/to/collection --out sdk
+kestrelcli codegen path/to/collection --out sdk
 ```
 
 The generated TypeScript SDK uses fetch without runtime dependencies. By default it writes a module directory with resource classes and lazy `Collection<T>` async iterables. Use `--single-file` to bundle it, `--archive` to package it as ZIP, or both; both options default to off and are also available in the desktop dialog. It supports nested resources, pagination, request bodies and inherited authentication, with credentials and variables supplied at runtime. Use `--overwrite` to replace a generated SDK. See the [SDK guide](crates/kestrel-codegen/README.md) for layouts, API examples, authentication and limitations.
+
+## MCP
+
+Build the server without the desktop dependencies:
+
+```bash
+cargo build --release -p kestrel-mcp
+```
+
+Add it to your MCP client's server configuration, using absolute paths:
+
+```json
+{
+  "mcpServers": {
+    "kestrel": {
+      "command": "/absolute/path/to/kestrel-mcp",
+      "args": ["/absolute/path/to/collection"]
+    }
+  }
+}
+```
+
+You can also use `kestrelcli mcp /path/to/collection` (`command` is the absolute path to `kestrelcli`, `args` is `["mcp", "/path/to/collection"]`), or `cargo mcp examples/httpbin` during development. Both entry points use the same server. The collection defaults to the current directory. The transport is stdio: stdout carries only MCP messages; errors go to stderr and Kestrel's error log. The server uses the [official Rust MCP SDK](https://github.com/modelcontextprotocol/rust-sdk).
+
+| Tool | Operation |
+|---|---|
+| `collection_info` | Collection name, request count and environment names |
+| `list_requests` | Relative paths, names, HTTP methods and saved URLs |
+| `get_request` | Complete saved request as an OpenCollection JSON object |
+| `list_environments` | Saved variables; values marked `secret` are hidden |
+| `create_request` | Create a request in the collection or an existing folder |
+| `update_request` | Apply a partial request object while preserving omitted and unknown fields |
+| `send_request` | Send one request with inherited auth, scripts and tests |
+| `run_collection` | Run a request, folder or the entire collection |
+| `reset_session` | Clear runtime variables, environment overrides, cookies and OAuth tokens |
+
+Paths are relative to the configured collection; absolute paths, `..` and paths resolving outside it are rejected. File reads see the latest saved collection. Updates use `Document::save` to preserve Bruno YAML key order and section spacing; an unchanged patch leaves the file byte for byte intact. `update_request` accepts `path` and `patch`, for example `{"path":"Users/List.yml","patch":{"http":{"url":"{{baseUrl}}/users"}}}`. Nested objects merge, arrays replace, and `null` removes a field.
+
+Execution accepts `path`, `environment`, `variables`, `bail`, `max_requests` (default 100, maximum 1000) and `timeout_seconds` (per request, default 60, maximum 300). `send_request` requires a request path. `run_collection` defaults to the entire collection and honors script ordering and `setNextRequest`, stopping on the execution limit to prevent loops. Results include `passed`, response status, headers, body, timings, script logs and tests. HTTP bodies are returned as UTF-8 text with replacement for invalid bytes, limited to 64 KiB per response with the original byte count and a truncation flag. Request and test failures appear in the result with `passed: false`; invalid tool arguments and file errors return an MCP tool error.
+
+The server runs local collection scripts and can send requests that change remote data. Use trusted collections. Runtime variables, cookies and tokens persist for the server session; supplied `variables` also persist. File edits and executions are serialized within their respective operations. Interactive OAuth browser sign-in is unavailable over MCP; client credentials, password grants and token variables work through the core. `.env` is loaded for execution but never returned by environment listing. Raw saved requests and HTTP responses can contain credentials; keep credentials in the git-ignored `.env` file and use `{{process.env.NAME}}` placeholders in requests.
+
+```bash
+cargo test -p kestrel-mcp
+```
+
+The integration tests launch the stdio server through an MCP client and use a loopback HTTP server; they do not call external APIs.
 
 ## Shortcuts
 

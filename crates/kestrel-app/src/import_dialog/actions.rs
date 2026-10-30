@@ -142,7 +142,7 @@ impl ImportDialog {
                     progress.start("Opening imported collection", Some(files as u64), kestrel_core::transfer::Unit::Files)?;
                     let collection = kestrel_core::Collection::open_with_progress(&root, &progress)?;
                     progress.finish()?;
-                    Ok::<_, anyhow::Error>((root, Some(collection)))
+                    Ok::<_, anyhow::Error>((root, Some(crate::project::IndexedCollection::new(collection))))
                 })
                 .await;
             match imported {

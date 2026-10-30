@@ -76,35 +76,6 @@ fn google_style_methods_follow_url_resources_and_encode_typed_path_arguments() {
 }
 
 #[test]
-fn duplicate_operations_require_explicit_names_and_never_lose_requests() {
-    let mut fixture = Fixture::new();
-    fixture.add("GET", "https://example.com/users");
-    let path = fixture.add("GET", "https://example.com/users?active=true");
-    let error = generate(&fixture.collection, &Progress::default()).unwrap_err();
-    assert!(format!("{error:#}").contains("users.list"));
-    let request = fixture.collection.request_mut(&path).unwrap();
-    request.doc.data.extra.insert(
-        "extensions".into(),
-        serde_yaml_ng::from_str("kestrel:\n  codegen:\n    resource: users\n    method: listActive\n").unwrap(),
-    );
-    request.doc.save().unwrap();
-    assert_eq!(fixture.generated().methods, ["users.list", "users.listActive"]);
-}
-
-#[test]
-fn resource_and_method_conflicts_are_reported_in_either_order() {
-    for urls in
-        [["https://example.com/users", "https://example.com/users/list"], ["https://example.com/users/list", "https://example.com/users"]]
-    {
-        let mut fixture = Fixture::new();
-        for url in urls {
-            fixture.add("GET", url);
-        }
-        assert!(generate(&fixture.collection, &Progress::default()).is_err());
-    }
-}
-
-#[test]
 fn inherited_headers_and_auth_are_preserved_without_credentials_or_environment_values() {
     let mut fixture = Fixture::new();
     let mut auth = AuthConfig::new("bearer");

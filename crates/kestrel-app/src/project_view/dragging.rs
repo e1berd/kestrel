@@ -65,8 +65,8 @@ impl ProjectView {
     pub(super) fn render_root_drop_zone(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
         self.render_drop_zone(MoveTarget::Inside(self.root(cx)), cx)
-            .flex_1()
-            .min_h(rems(2.))
+            .h(rems(2.))
+            .flex_none()
             .rounded(dp(8.))
             .when(cx.has_active_drag(), |element| {
                 element.flex().items_center().justify_center().text_xs().text_color(palette.muted).child("Move to collection root")
@@ -111,14 +111,14 @@ impl ProjectView {
         let task = cx.background_spawn(async move {
             let mut collection = Collection::open(&root)?;
             let new_path = collection.move_item(&path, &target)?;
-            anyhow::Ok((collection, path, new_path))
+            anyhow::Ok((crate::project::IndexedCollection::new(collection), path, new_path))
         });
         let project = self.project.clone();
         cx.spawn_in(window, async move |view, cx| {
             match task.await {
                 Ok((collection, old, new)) => {
-                    project.update(cx, |project, _| {
-                        project.collection = collection;
+                    project.update(cx, |project, cx| {
+                        project.replace_collection(collection, cx);
                         project.load_error = None;
                     });
                     view.update_in(cx, |view, window, cx| view.relocate_tree_state(&old, &new, window, cx))

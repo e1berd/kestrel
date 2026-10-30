@@ -9,6 +9,7 @@ macro_rules! primary {
 mod appearance;
 mod assets;
 mod codegen_dialog;
+mod collection_tree;
 mod dialogs;
 mod env_editor;
 mod export_dialog;

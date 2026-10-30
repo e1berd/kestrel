@@ -49,10 +49,7 @@ pub(crate) fn read_dir_tracked(dir: &Path, ignored: &HashSet<String>, progress: 
             }
         }
     }
-    items.sort_by(|a, b| {
-        let folder = |item: &Item| matches!(item, Item::Folder(_));
-        folder(b).cmp(&folder(a)).then(a.seq().cmp(&b.seq())).then_with(|| a.name().to_lowercase().cmp(&b.name().to_lowercase()))
-    });
+    items.sort_by_cached_key(|item| (matches!(item, Item::Request(_)), item.seq(), item.name().to_lowercase()));
     Ok(items)
 }
 pub(crate) fn is_request_file(path: &Path) -> bool {

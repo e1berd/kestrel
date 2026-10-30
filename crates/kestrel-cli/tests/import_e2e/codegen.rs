@@ -25,15 +25,16 @@ fn imported_openapi_generates_resource_sdk_without_changing_the_collection() {
 }
 
 #[test]
-fn apidog_duplicate_requests_report_conflicts_and_allow_explicit_method_names() {
+fn apidog_duplicate_requests_get_unique_names_and_allow_explicit_overrides() {
     let directory = Directory::new();
     let root = directory.0.join("collection");
     succeed(directory.cli().arg("import").arg(fixtures().join("apidog.json")).arg("--out").arg(&root));
     let destination = directory.0.join("client.ts");
-    let output = directory.cli().arg("codegen").arg("--single-file").arg(&root).arg("--out").arg(&destination).output().unwrap();
-    assert_eq!(output.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("pets.insert"));
-    assert!(!destination.exists());
+    let before = snapshot(&root);
+    let output = succeed(directory.cli().arg("codegen").arg("--single-file").arg(&root).arg("--out").arg(&destination));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Renamed inferred SDK method pets.insert"));
+    assert!(destination.is_file());
+    assert_eq!(snapshot(&root), before);
     let mut collection = Collection::open(&root).unwrap();
     let path = collection
         .requests()
@@ -51,7 +52,7 @@ fn apidog_duplicate_requests_report_conflicts_and_allow_explicit_method_names() 
         .extra
         .insert("extensions".into(), serde_yaml_ng::from_str("kestrel:\n  codegen:\n    method: insertExample\n").unwrap());
     request.doc.save().unwrap();
-    let output = succeed(directory.cli().arg("codegen").arg("--single-file").arg(&root).arg("--out").arg(&destination));
+    let output = succeed(directory.cli().arg("codegen").arg("--single-file").arg(&root).arg("--out").arg(&destination).arg("--overwrite"));
     let stdout = String::from_utf8(output.stdout).unwrap();
     for method in ["pets.get", "pets.insert", "pets.insertExample", "upload.insert"] {
         assert!(stdout.contains(method), "{stdout}");

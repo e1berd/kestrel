@@ -43,7 +43,7 @@ impl RequestTab {
                         .bg(palette.tint(palette.danger))
                         .text_size(rems(0.84))
                         .text_color(palette.danger)
-                        .child(error),
+                        .child(crate::ui::error_message("response-copy-error", &error, cx)),
                 )
             })
             .child(self.render_response_pills(outcome, cx))

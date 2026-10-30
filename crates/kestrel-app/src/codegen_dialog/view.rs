@@ -113,7 +113,7 @@ impl Render for CodegenDialog {
                                 div().text_size(rems(0.8)).text_color(palette.warning).child(warning.clone())
                             }))
                     }))
-                    .children(self.error.as_ref().map(|error| div().text_color(palette.danger).child(error.clone()))),
+                    .children(self.error.as_ref().map(|error| crate::ui::error_message("codegen-copy-error", error, cx))),
             )
             .child(self.render_footer(cx))
     }
