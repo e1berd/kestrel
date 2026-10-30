@@ -1,0 +1,18 @@
+[package]
+name = "kestrel-codegen"
+description = "Resource-oriented SDK generation from Kestrel collections."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kestrel-core.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+uuid.workspace = true
+zip.workspace = true
+
+[dev-dependencies]
+serde_yaml_ng.workspace = true

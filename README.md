@@ -4,8 +4,6 @@ A free, open-source API client that keeps your requests as plain files in git. B
 
 Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the OpenCollection YAML format) and writes them back byte for byte, so a save shows in `git diff` only where you changed something. Everything is free: no account, no cloud, no limits on OpenAPI imports.
 
-Code name: **volley**.
-
 ## What it does
 
 - **File-based collections**: one YAML file per request, `folder.yml` per folder, `environments/*.yml`, secrets in `.env` (ignored by git).
@@ -54,7 +52,7 @@ Import formats are detected automatically; `--format openapi` or `--format apido
 
 Apidog imports preserve HTTP requests, nested folders, descriptions, parameters, request bodies and response schemas. Apidog environments, test scenarios and processors require manual migration; the preview lists skipped data. Authentication credentials become `{{process.env.API_TOKEN}}`, `{{process.env.API_KEY}}` or `{{process.env.API_USERNAME}}` / `{{process.env.API_PASSWORD}}` placeholders. Authorization headers use `{{process.env.AUTHORIZATION}}`. Add their values to the collection's git-ignored `.env` file.
 
-`cargo test -p volley-cli --test import_e2e` checks the importer against [38 pinned public OpenAPI/Swagger examples](crates/volley-import/tests/fixtures/upstream/README.md), native Apidog fixtures and a local HTTP server. It runs without internet access.
+`cargo test -p kestrel-cli --test import_e2e` checks the importer against [38 pinned public OpenAPI/Swagger examples](crates/kestrel-import/tests/fixtures/upstream/README.md), native Apidog fixtures and a local HTTP server. It runs without internet access.
 
 Choose **Export collection…** from the collection menu or command palette, or run:
 
@@ -63,7 +61,7 @@ kestrel-cli export path/to/collection --out openapi.yaml --format openapi32 --en
 kestrel-cli export path/to/collection --out project.apidog.json --format apidog
 ```
 
-Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apidog`. Use `--overwrite` to replace an existing export file. The desktop and terminal show actual progress for reading, conversion and writing. Transfers use temporary disk storage; the [transfer guide](crates/volley-import/README.md) documents memory behavior, cancellation, format limitations and reproducible large-file checks.
+Export formats are `openapi30`, `openapi31`, `openapi32`, `swagger20` and `apidog`. Use `--overwrite` to replace an existing export file. The desktop and terminal show actual progress for reading, conversion and writing. Transfers use temporary disk storage; the [transfer guide](crates/kestrel-import/README.md) documents memory behavior, cancellation, format limitations and reproducible large-file checks.
 
 ```bash
 kestrel-cli sync path/to/collection
@@ -75,7 +73,7 @@ Choose **Generate SDK…** from the collection menu or command palette, or run:
 kestrel-cli codegen path/to/collection --out sdk
 ```
 
-The generated TypeScript SDK uses fetch without runtime dependencies. By default it writes a module directory with resource classes and lazy `Collection<T>` async iterables. Use `--single-file` to bundle it, `--archive` to package it as ZIP, or both; both options default to off and are also available in the desktop dialog. It supports nested resources, pagination, request bodies and inherited authentication, with credentials and variables supplied at runtime. Use `--overwrite` to replace a generated SDK. See the [SDK guide](crates/volley-codegen/README.md) for layouts, API examples, authentication and limitations.
+The generated TypeScript SDK uses fetch without runtime dependencies. By default it writes a module directory with resource classes and lazy `Collection<T>` async iterables. Use `--single-file` to bundle it, `--archive` to package it as ZIP, or both; both options default to off and are also available in the desktop dialog. It supports nested resources, pagination, request bodies and inherited authentication, with credentials and variables supplied at runtime. Use `--overwrite` to replace a generated SDK. See the [SDK guide](crates/kestrel-codegen/README.md) for layouts, API examples, authentication and limitations.
 
 ## Shortcuts
 
@@ -95,8 +93,8 @@ On macOS, Cmd instead of Ctrl.
 
 ## Colour schemes
 
-A scheme is a JSON file with a `light` and a `dark` palette of about twenty colours; see `crates/volley-app/assets/themes/kestrel.json`. Put your own in `~/.config/kestrel/themes/`, or press **Make my own** in the settings to start from the current one.
+A scheme is a JSON file with a `light` and a `dark` palette of about twenty colours; see `crates/kestrel-app/assets/themes/kestrel.json`. Put your own in `~/.config/kestrel/themes/`, or press **Make my own** in the settings to start from the current one.
 
 ## License
 
-MIT or Apache-2.0, at your option. Inter and JetBrains Mono are under the SIL Open Font License (see `crates/volley-app/assets/fonts`).
+MIT or Apache-2.0, at your option. Inter and JetBrains Mono are under the SIL Open Font License (see `crates/kestrel-app/assets/fonts`).

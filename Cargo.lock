@@ -3628,6 +3628,119 @@ dependencies = [
 ]
 
 [[package]]
+name = "kestrel-app"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "dirs 6.0.0",
+ "futures",
+ "gpui-component",
+ "gpui-kit-assets",
+ "gpui-pre",
+ "gpui-pre-platform",
+ "image",
+ "indexmap",
+ "kestrel-codegen",
+ "kestrel-core",
+ "kestrel-import",
+ "kestrel-openapi",
+ "notify",
+ "rustls",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+]
+
+[[package]]
+name = "kestrel-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "futures",
+ "kestrel-codegen",
+ "kestrel-core",
+ "kestrel-import",
+ "kestrel-openapi",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
+name = "kestrel-codegen"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "kestrel-core",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "url",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "kestrel-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "chrono",
+ "dirs 6.0.0",
+ "dotenvy",
+ "futures",
+ "indexmap",
+ "jsonwebtoken",
+ "open",
+ "percent-encoding",
+ "rand 0.9.5",
+ "reqwest",
+ "rquickjs",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "sha2 0.10.9",
+ "tokio",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "kestrel-import"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "kestrel-core",
+ "kestrel-openapi",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serde_yaml_ng",
+ "url",
+ "uuid",
+ "yaml-rust2",
+]
+
+[[package]]
+name = "kestrel-openapi"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "kestrel-core",
+ "reqwest",
+ "serde_json",
+ "serde_yaml_ng",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7540,119 +7653,6 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
-
-[[package]]
-name = "volley-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "dirs 6.0.0",
- "futures",
- "gpui-component",
- "gpui-kit-assets",
- "gpui-pre",
- "gpui-pre-platform",
- "image",
- "indexmap",
- "notify",
- "rustls",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "volley-codegen",
- "volley-core",
- "volley-import",
- "volley-openapi",
-]
-
-[[package]]
-name = "volley-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "futures",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "tokio",
- "uuid",
- "volley-codegen",
- "volley-core",
- "volley-import",
- "volley-openapi",
-]
-
-[[package]]
-name = "volley-codegen"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "url",
- "uuid",
- "volley-core",
- "zip",
-]
-
-[[package]]
-name = "volley-core"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "chrono",
- "dirs 6.0.0",
- "dotenvy",
- "futures",
- "indexmap",
- "jsonwebtoken",
- "open",
- "percent-encoding",
- "rand 0.9.5",
- "reqwest",
- "rquickjs",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "sha2 0.10.9",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "volley-import"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "indexmap",
- "reqwest",
- "serde",
- "serde_json",
- "serde_yaml_ng",
- "url",
- "uuid",
- "volley-core",
- "volley-openapi",
- "yaml-rust2",
-]
-
-[[package]]
-name = "volley-openapi"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "indexmap",
- "reqwest",
- "serde_json",
- "serde_yaml_ng",
- "url",
- "uuid",
- "volley-core",
-]
 
 [[package]]
 name = "vswhom"

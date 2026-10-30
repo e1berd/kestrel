@@ -11,7 +11,7 @@ def main():
     parser.add_argument("--download", action="store_true", help="download the pinned revision and verify its hashes")
     arguments = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
-    fixtures = root / "crates/volley-import/tests/fixtures/upstream/oai"
+    fixtures = root / "crates/kestrel-import/tests/fixtures/upstream/oai"
     manifest = json.loads((fixtures / "manifest.json").read_text())
     repository = manifest["repository"].removeprefix("https://github.com/")
     revision = manifest["revision"]

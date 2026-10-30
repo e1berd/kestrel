@@ -1,20 +1,20 @@
 [workspace]
 resolver = "3"
-members = ["crates/volley-core", "crates/volley-openapi", "crates/volley-import", "crates/volley-codegen", "crates/volley-cli", "crates/volley-app"]
-default-members = ["crates/volley-app"]
+members = ["crates/kestrel-core", "crates/kestrel-openapi", "crates/kestrel-import", "crates/kestrel-codegen", "crates/kestrel-cli", "crates/kestrel-app"]
+default-members = ["crates/kestrel-app"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/volley-http/volley"
+repository = "https://github.com/e1berd/kestrel"
 rust-version = "1.88"
 
 [workspace.dependencies]
-volley-core = { path = "crates/volley-core" }
-volley-openapi = { path = "crates/volley-openapi" }
-volley-import = { path = "crates/volley-import" }
-volley-codegen = { path = "crates/volley-codegen" }
+kestrel-core = { path = "crates/kestrel-core" }
+kestrel-openapi = { path = "crates/kestrel-openapi" }
+kestrel-import = { path = "crates/kestrel-import" }
+kestrel-codegen = { path = "crates/kestrel-codegen" }
 anyhow = "1"
 thiserror = "2"
 serde = { version = "1", features = ["derive"] }

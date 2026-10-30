@@ -1,2 +1,2 @@
 [alias]
-cli = "run -p volley-cli --"
+cli = "run -p kestrel-cli --"

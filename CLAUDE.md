@@ -1,6 +1,6 @@
 # Kestrel — правила проекта
 
-Kestrel (code name **volley**) — бесплатный open-source API-клиент на GPUI, альтернатива Postman и Bruno. Коллекции — обычные файлы в git, в формате OpenCollection YAML, который пишет Bruno 3.
+Kestrel — бесплатный open-source API-клиент на GPUI, альтернатива Postman и Bruno. Коллекции — обычные файлы в git, в формате OpenCollection YAML, который пишет Bruno 3.
 
 Эти правила обязательны для всех разработчиков и AI-агентов и имеют приоритет над стилем сгенерированного кода. Общая основа — [e1berd/dotconfig](https://github.com/e1berd/dotconfig), здесь она переложена на Rust.
 
@@ -12,14 +12,14 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 
 | Крейт | Что в нём |
 |---|---|
-| `crates/volley-core` | Формат файлов, коллекция, окружения, переменные, отправка запросов, OAuth2, JS-скрипты, `report_error` |
-| `crates/volley-openapi` | OpenAPI 3 → коллекция: импорт и повторный синк без потери правок |
-| `crates/volley-cli` | `kestrel-cli`: запуск коллекций в терминале и CI, импорт и синк |
-| `crates/volley-app` | Приложение `kestrel` на GPUI; пакет по умолчанию: `cargo run` запускает его |
+| `crates/kestrel-core` | Формат файлов, коллекция, окружения, переменные, отправка запросов, OAuth2, JS-скрипты, `report_error` |
+| `crates/kestrel-openapi` | OpenAPI 3 → коллекция: импорт и повторный синк без потери правок |
+| `crates/kestrel-cli` | `kestrel-cli`: запуск коллекций в терминале и CI, импорт и синк |
+| `crates/kestrel-app` | Приложение `kestrel` на GPUI; пакет по умолчанию: `cargo run` запускает его |
 
 `cargo cli …` — алиас для `kestrel-cli` (`.cargo/config.toml`). `cargo build` и `cargo test` без `--workspace` трогают только приложение.
 
-В `volley-app`:
+В `kestrel-app`:
 - `appearance/` — дизайн-система: палитры, разворачивание в тему gpui-component, масштаб (`dp()`), шрифты, режим для слабовидящих;
 - `workspace/` — окно: несколько открытых проектов, лента проектов, заголовок, экран приветствия;
 - `project_view/` — один проект: дерево, вкладки, действия над деревом, синк OpenAPI;
@@ -36,7 +36,7 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 - Сгенерированное из OpenAPI должно совпадать с тем, что генерирует Bruno: повторный синк из того же spec — **0 изменённых файлов**.
 - Проверка на настоящей коллекции:
   ```bash
-  KESTREL_COMPAT_DIR=/путь/к/коллекции cargo test -p volley-core --test compat
+  KESTREL_COMPAT_DIR=/путь/к/коллекции cargo test -p kestrel-core --test compat
   ```
 
 ---
@@ -91,7 +91,7 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 
 ## 5. Ошибки: никаких немых
 
-Каждая перехваченная ошибка попадает в единую точку `volley_core::report::report_error` (stderr + `~/.local/state/kestrel/errors.log`).
+Каждая перехваченная ошибка попадает в единую точку `kestrel_core::report::report_error` (stderr + `~/.local/state/kestrel/errors.log`).
 
 - Запрещено: `let _ = result;`, `.ok();` без обработки `None`, `unwrap_or_default()` там, где ошибка что-то значит.
 - `result.report_err("что делали")` — когда нужно сообщить и продолжить (`ReportExt`).
@@ -104,7 +104,7 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 
 - **Цвета только из темы**: `cx.theme()` (поля gpui-component) или `appearance::palette(cx)` (методы, статусы). Никаких hex-литералов во вьюхах.
 - **Цветовая схема** — JSON с двумя палитрами (`light`, `dark`) из ~20 семантических токенов: `background`, `surface`, `raised`, `border`, `hover`, `text`, `muted`, `accent`, `accent_text`, `selection`, `success`, `warning`, `danger`, `info`, `methods.{get,post,put,patch,delete,other}`.
-  - Встроенные: `crates/volley-app/assets/themes/*.json` (+ строка в `palette::BUILT_IN`).
+  - Встроенные: `crates/kestrel-app/assets/themes/*.json` (+ строка в `palette::BUILT_IN`).
   - Пользовательские: `~/.config/kestrel/themes/*.json` (кнопка «Make my own» в настройках копирует текущую).
   - Во все ~100 полей gpui-component токены разворачивает `appearance/expand.rs`. Новый токен добавляется туда, а не точечно во вьюху.
 - **Размеры**: структурные (ширины панелей, отступы, иконки) — через `dp(…)`, они следуют масштабу интерфейса. Высота строк с текстом — в `rems(…)` или `text_*`, тогда она следует размеру текста. Голый `px(…)` в разметке не используется.
@@ -115,7 +115,7 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 
 ## 7. GPUI
 
-- Сеть и скрипты — на `volley_core::runtime()` (tokio), результат ждётся в `cx.spawn_in`. Блокирующий ввод-вывод — в `cx.background_spawn`. UI-поток не блокируется никогда.
+- Сеть и скрипты — на `kestrel_core::runtime()` (tokio), результат ждётся в `cx.spawn_in`. Блокирующий ввод-вывод — в `cx.background_spawn`. UI-поток не блокируется никогда.
 - В замыканиях меню и диалогов — `WeakEntity` (`cx.entity().downgrade()`), не сильные ссылки.
 - Шорткаты задаются макросом `primary!("s")` (Cmd на macOS, Ctrl на остальных): `KeyBinding::new` в gpui 0.3.10 не понимает `secondary-`.
 - Состояние, которое переживает перезапуск, лежит в `Prefs` (`~/.config/kestrel/prefs.json`), никогда не в коллекции.
@@ -141,7 +141,7 @@ Kestrel (code name **volley**) — бесплатный open-source API-клие
 
 ```bash
 cargo +1.92.0 fmt --all --check
-cargo +1.92.0 clippy -p volley-core -p volley-openapi -p volley-cli --all-targets
+cargo +1.92.0 clippy -p kestrel-core -p kestrel-openapi -p kestrel-cli --all-targets
 cargo test --workspace
-KESTREL_COMPAT_DIR=/путь/к/коллекции cargo test -p volley-core --test compat
+KESTREL_COMPAT_DIR=/путь/к/коллекции cargo test -p kestrel-core --test compat
 ```
