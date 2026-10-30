@@ -9,6 +9,7 @@ use kestrel_core::{Document, Outcome};
 use crate::kv_table::{KvChanged, KvTable};
 use crate::project::{Project, ProjectEvent};
 mod build;
+mod path_params;
 mod persistence;
 mod relocation;
 mod response;
@@ -104,6 +105,7 @@ pub struct RequestTab {
     sending: Option<Task<()>>,
     preview: String,
     missing: Vec<String>,
+    missing_path_params: Vec<String>,
     token_status: Option<String>,
     variable_popup: Option<variable_popup::VariablePopup>,
     editor_marks: Vec<(gpui::EntityId, TextDecorationCollection)>,
@@ -169,6 +171,7 @@ impl RequestTab {
             sending: None,
             preview: String::new(),
             missing: Vec::new(),
+            missing_path_params: Vec::new(),
             token_status: None,
             variable_popup: None,
             editor_marks: Vec::new(),

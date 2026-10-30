@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export PATH="$directory/usr/bin:$PATH"
+export LD_LIBRARY_PATH="$directory/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export XDG_DATA_DIRS="$directory/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+executable=kestrel
+case "${1:-}" in
+    --kestrelcli) executable=kestrelcli; shift ;;
+    --kestrel-mcp) executable=kestrel-mcp; shift ;;
+esac
+exec "$directory/usr/bin/$executable" "$@"

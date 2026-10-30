@@ -109,9 +109,7 @@ impl RequestTab {
 
     pub(super) fn sync_path_params(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let url = self.url.read(cx).value().to_string();
-        let path = url.split(['?', '#']).next().unwrap_or_default();
-        let names: Vec<String> =
-            path.split('/').filter_map(|s| s.strip_prefix(':')).filter(|s| !s.is_empty()).map(str::to_string).collect();
+        let names = kestrel_core::http::path_param_names(&url);
         self.params.update(cx, |table, cx| {
             table.retain_kind("path", &names, cx);
             for name in &names {
@@ -134,6 +132,7 @@ impl RequestTab {
             .filter(|p| p.enabled() && p.kind.as_deref() == Some("path"))
             .map(|p| (p.name.clone(), scope.interpolate(&p.value)))
             .collect();
+        self.missing_path_params = kestrel_core::http::missing_path_params(&url, &path_params);
         let mut preview = kestrel_core::http::fill_path_params(&url, &path_params);
         let query: Vec<String> = http
             .params

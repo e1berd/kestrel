@@ -138,4 +138,9 @@ impl SidebarTree {
     pub fn node(&self, row: usize) -> Option<&TreeNode> {
         self.index.nodes.get(*self.rows.get(row)?)
     }
+
+    pub fn row_position(&self, path: &Path) -> Option<usize> {
+        let node = self.index.paths.get(path)?;
+        self.rows.binary_search(node).ok()
+    }
 }

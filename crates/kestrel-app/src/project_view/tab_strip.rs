@@ -1,10 +1,12 @@
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    Context, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, StatefulInteractiveElement as _, Styled as _, div, rems,
+    AppContext as _, Context, InteractiveElement as _, IntoElement, MouseButton, ParentElement as _, StatefulInteractiveElement as _,
+    Styled as _, div, rems,
 };
 use gpui_component::{Icon, IconName, Sizable as _, h_flex};
 
 use super::ProjectView;
+use super::tab_dragging::TabDrag;
 use crate::appearance::{self, dp};
 use crate::ui::method_label;
 
@@ -23,10 +25,14 @@ impl ProjectView {
             .bg(palette.code)
             .overflow_x_scroll()
             .children(self.tabs.iter().enumerate().map(|(index, tab)| {
+                let tab_id = tab.entity_id();
                 let tab = tab.read(cx);
+                let drag = TabDrag { project: cx.entity_id(), tab: tab_id, title: tab.title(), method: tab.method().to_string() };
+                let dirty = tab.dirty;
                 let is_active = index == self.active;
                 h_flex()
                     .id(("tab", index))
+                    .relative()
                     .flex_none()
                     .h(rems(2.1))
                     .max_w(dp(260.))
@@ -44,8 +50,10 @@ impl ProjectView {
                     .when(!is_active, |el| {
                         el.border_color(gpui::transparent_black()).text_color(palette.muted).hover(|el| el.bg(palette.hover))
                     })
-                    .child(method_label(tab.method(), cx))
-                    .child(div().min_w_0().truncate().child(tab.title()))
+                    .child(method_label(&drag.method, cx))
+                    .child(div().min_w_0().truncate().child(drag.title.clone()))
+                    .on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()))
+                    .when(cx.has_active_drag(), |element| element.child(self.render_tab_drop_zones(tab_id, cx)))
                     .child(
                         div()
                             .id(("close-tab", index))
@@ -56,7 +64,7 @@ impl ProjectView {
                             .items_center()
                             .justify_center()
                             .hover(|el| el.bg(palette.hover))
-                            .child(if tab.dirty {
+                            .child(if dirty {
                                 div().size(dp(7.)).rounded_full().bg(palette.accent).into_any_element()
                             } else {
                                 Icon::new(IconName::Close).xsmall().text_color(palette.faint).into_any_element()

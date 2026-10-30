@@ -2,13 +2,27 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use gpui::{AppContext as _, Context};
+use gpui::{AppContext as _, Context, ScrollStrategy, Window};
 
 use super::ProjectView;
 use crate::collection_tree::SidebarTree;
 use crate::ui::ReportUnlessGone as _;
 
 impl ProjectView {
+    pub(super) fn reveal_request(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
+        self.refresh_sidebar(cx);
+        self.expand_ancestors(path, cx);
+        if self.filtering || self.sidebar.row_position(path).is_none() {
+            self.filter_task = None;
+            self.filtering = false;
+            self.filter.update(cx, |filter, cx| filter.set_value("", window, cx));
+            self.sidebar.show_expanded(&self.expanded);
+        }
+        if let Some(position) = self.sidebar.row_position(path) {
+            self.tree_scroll.scroll_to_item(position, ScrollStrategy::Nearest);
+        }
+    }
+
     pub(super) fn refresh_sidebar(&mut self, cx: &mut Context<Self>) {
         let project = self.project.read(cx);
         if Arc::ptr_eq(&self.sidebar.index, &project.tree) {

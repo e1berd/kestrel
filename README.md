@@ -29,6 +29,8 @@ cargo run --release
 
 On Linux, `packaging/linux/install.sh` builds a release, puts `kestrel`, `kestrelcli` and `kestrel-mcp` in `~/.local/bin` and adds the app with its icon to the application menu.
 
+To build `.deb` and `.AppImage` packages for Linux or Apple Silicon, Intel and universal `.dmg` images in a macOS VM, see the [packaging guide](packaging/README.md).
+
 `cargo run` starts the app; it reopens the collections that were open last time, and the first time it shows a welcome screen to open one. `cargo cli …` runs `kestrelcli` (for example `cargo cli run examples/httpbin --env public`). `cargo build --release --workspace` builds all three executables into `target/release/`. The Rust package remains `kestrel-cli`; its executable is named `kestrelcli`.
 
 ## Use

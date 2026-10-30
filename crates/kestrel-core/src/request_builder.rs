@@ -38,6 +38,10 @@ pub(crate) async fn build(
     }
     let path_params: Vec<(String, String)> =
         http.params.iter().filter(|p| p.enabled() && p.kind.as_deref() == Some("path")).map(|p| (p.name.clone(), i(&p.value))).collect();
+    let missing = missing_path_params(&url, &path_params);
+    if !missing.is_empty() {
+        bail!("path parameters are not set: {}. Enter their values in Params (type path).", missing.join(", "));
+    }
     url = fill_path_params(&url, &path_params);
     if !url.contains("://") {
         url = format!("http://{url}");
@@ -194,6 +198,34 @@ pub(crate) fn interpolate_auth(config: &AuthConfig, scope: &Scope) -> AuthConfig
 }
 const SEGMENT: &AsciiSet =
     &CONTROLS.add(b' ').add(b'"').add(b'#').add(b'<').add(b'>').add(b'?').add(b'`').add(b'{').add(b'}').add(b'/').add(b'%');
+
+pub fn path_param_names(url: &str) -> Vec<String> {
+    let head = url.split(['?', '#']).next().unwrap_or_default();
+    let path = if let Some((_, authority)) = head.split_once("://").or_else(|| head.strip_prefix("//").map(|authority| ("", authority))) {
+        authority.find('/').map_or("", |start| &authority[start..])
+    } else {
+        head
+    };
+    let mut names = Vec::new();
+    for segment in path.split('/') {
+        if let Some(name) = segment.strip_prefix(':').filter(|name| !name.is_empty())
+            && !names.iter().any(|existing| existing == name)
+        {
+            names.push(name.to_string());
+        }
+    }
+    names
+}
+
+pub fn missing_path_params(url: &str, params: &[(String, String)]) -> Vec<String> {
+    path_param_names(url)
+        .into_iter()
+        .filter(|name| {
+            !params.iter().any(|(candidate, value)| candidate == name && !value.is_empty() && crate::vars::names(value).is_empty())
+        })
+        .collect()
+}
+
 pub fn fill_path_params(url: &str, params: &[(String, String)]) -> String {
     let (head, tail) = match url.find(['?', '#']) {
         Some(i) => url.split_at(i),
@@ -227,5 +259,21 @@ mod tests {
             "http://h/api/tickets/42/drafts/a%20b?x=1"
         );
         assert_eq!(fill_path_params("http://h/:missing", &params), "http://h/:missing");
+    }
+
+    #[test]
+    fn missing_path_values_include_empty_and_unresolved_variables() {
+        let params = vec![("operator_id".into(), "".into()), ("team_id".into(), "{{team}}".into()), ("id".into(), "42".into())];
+        assert_eq!(missing_path_params("http://h/:operator_id/:team_id/:id/:absent", &params), ["operator_id", "team_id", "absent"]);
+        assert!(missing_path_params("http://h/:id", &params).is_empty());
+    }
+
+    #[test]
+    fn path_names_exclude_authority_query_fragment_and_duplicates() {
+        assert_eq!(path_param_names("http://[::1]:8080/:id/:id?next=/:query#/:fragment"), ["id"]);
+        assert_eq!(path_param_names("{{baseUrl}}/operators/:operator_id"), ["operator_id"]);
+        assert_eq!(path_param_names("//localhost:8080/:id"), ["id"]);
+        assert!(path_param_names("http://:port").is_empty());
+        assert!(path_param_names("http://h/time/12:30?name=:name").is_empty());
     }
 }

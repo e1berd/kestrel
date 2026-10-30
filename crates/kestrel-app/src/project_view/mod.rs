@@ -3,6 +3,7 @@ mod empty_state;
 mod openapi_sync;
 mod sidebar;
 mod sidebar_state;
+mod tab_dragging;
 mod tab_strip;
 mod tree_actions;
 
@@ -95,6 +96,7 @@ impl ProjectView {
 
     pub fn open_request(&mut self, path: &Path, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(index) = self.tabs.iter().position(|tab| tab.read(cx).path == path) {
+            self.reveal_request(path, window, cx);
             self.active = index;
             cx.notify();
             return;
@@ -102,7 +104,7 @@ impl ProjectView {
         if self.project.read(cx).collection.request(path).is_none() {
             return;
         }
-        self.expand_ancestors(path, cx);
+        self.reveal_request(path, window, cx);
         let project = self.project.clone();
         let path = path.to_path_buf();
         let tab = cx.new(|cx| RequestTab::new(project, path, window, cx).expect("the request is in the collection"));

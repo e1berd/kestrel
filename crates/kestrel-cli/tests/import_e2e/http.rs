@@ -1,4 +1,5 @@
-use kestrel_core::Collection;
+use kestrel_core::format::{KeyValue, RequestFile, Runtime, Script};
+use kestrel_core::{Collection, Document};
 use serde_json::Value as Json;
 
 use super::support::server::Server;
@@ -61,6 +62,48 @@ fn imported_requests_execute_against_a_local_http_server() {
             }
         }
     }
+}
+
+#[test]
+fn path_parameters_require_values_and_resolve_after_before_request_scripts() {
+    let directory = Directory::new();
+    let root = directory.0.join("collection");
+    Collection::create(&root, "Path parameters").unwrap();
+    let server = Server::new(|_| (200, br#"{"ok":true}"#.to_vec()));
+    let file = RequestFile::new_http("Operator", "GET", &format!("{}/operators/:operator_id", server.url));
+    let mut document = Document::new(root.join("operator.yml"), file, true);
+    let mut disabled = KeyValue::new("operator_id", "42").with_kind("path");
+    disabled.disabled = true;
+    for params in [
+        vec![],
+        vec![KeyValue::new("operator_id", "").with_kind("path")],
+        vec![KeyValue::new("operator_id", "{{operatorId}}").with_kind("path")],
+        vec![disabled],
+    ] {
+        document.data.http.as_mut().unwrap().params = params;
+        document.save().unwrap();
+        let output = directory.cli().arg("run").arg(&document.path).arg("--json").output().unwrap();
+        assert!(!output.status.success());
+        let outcome: Json = serde_json::from_slice(&output.stdout).unwrap();
+        assert!(outcome["error"].as_str().unwrap().contains("path parameters are not set: operator_id"));
+        assert!(server.requests().is_empty());
+    }
+    document.data.http.as_mut().unwrap().params = vec![KeyValue::new("operator_id", "{{operatorId}}").with_kind("path")];
+    document.data.runtime = Some(Runtime {
+        scripts: vec![Script {
+            kind: "before-request".into(),
+            code: "bru.setVar('operatorId', 'alice/a b');".into(),
+            ..Default::default()
+        }],
+        ..Default::default()
+    });
+    document.save().unwrap();
+    let output = succeed(directory.cli().arg("run").arg(&document.path).arg("--json"));
+    let outcome: Json = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(outcome["status"], 200);
+    let received = server.requests();
+    assert_eq!(received.len(), 1);
+    assert_eq!(received[0].path, "/operators/alice%2Fa%20b");
 }
 
 #[test]

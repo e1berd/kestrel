@@ -56,6 +56,7 @@ impl RequestTab {
                         el.child(div().flex_none().text_color(palette.danger).child(format!("not set: {}", self.missing.join(", "))))
                     }),
             )
+            .when(!self.missing_path_params.is_empty(), |element| element.child(self.render_missing_path_params(cx)))
             .when(self.changed_on_disk, |el| el.child(self.render_disk_conflict(cx)))
     }
 
@@ -94,9 +95,19 @@ impl RequestTab {
             Button::new("method").ghost().h_full().rounded(dp(8.)).pl(dp(10.)).pr(dp(8.)).child(label).dropdown_menu(move |menu, _, _| {
                 METHODS.iter().fold(menu, |menu, candidate| {
                     let tab = tab.clone();
-                    menu.item(PopupMenuItem::new(*candidate).checked(*candidate == method).on_click(move |_, _, cx| {
-                        tab.update(cx, |tab, cx| tab.set_method(candidate, cx)).report_unless_gone("change the method");
-                    }))
+                    menu.item(
+                        PopupMenuItem::element(move |_, cx| {
+                            div()
+                                .font_family(MONO_FONT)
+                                .font_weight(FontWeight::BOLD)
+                                .text_color(method_color(candidate, cx))
+                                .child(*candidate)
+                        })
+                        .checked(*candidate == method)
+                        .on_click(move |_, _, cx| {
+                            tab.update(cx, |tab, cx| tab.set_method(candidate, cx)).report_unless_gone("change the method");
+                        }),
+                    )
                 })
             }),
         )

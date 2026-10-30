@@ -35,7 +35,7 @@ pub fn method_badge(method: &str, cx: &App) -> impl IntoElement {
         .child(short_method(method))
 }
 
-pub fn method_label(method: &str, cx: &App) -> impl IntoElement {
+pub fn method_label(method: &str, cx: &App) -> impl IntoElement + use<> {
     div()
         .flex_none()
         .font_family(MONO_FONT)

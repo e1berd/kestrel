@@ -14,7 +14,7 @@ use gpui_kit_assets::IconName;
 use super::ProjectView;
 use super::dragging::TreeDrag;
 use crate::appearance::{self, dp};
-use crate::ui::{ReportUnlessGone as _, method_badge};
+use crate::ui::{ReportUnlessGone as _, method_label};
 
 #[derive(Clone)]
 struct Row {
@@ -138,7 +138,7 @@ impl ProjectView {
                 )
                 .child(Icon::new(if row.is_open { IconName::FolderOpen } else { IconName::Folder }).size(dp(14.)))
                 .into_any_element(),
-            Some(method) => method_badge(method, cx).into_any_element(),
+            Some(method) => method_label(method, cx).into_any_element(),
         };
         let view = cx.entity().downgrade();
         let menu_path = path.clone();
@@ -150,7 +150,7 @@ impl ProjectView {
             .h(rems(2.0))
             .pl(dp(indent))
             .pr(dp(8.))
-            .gap(dp(8.))
+            .gap(dp(if is_folder { 8. } else { 4. }))
             .items_center()
             .rounded(dp(8.))
             .cursor_pointer()

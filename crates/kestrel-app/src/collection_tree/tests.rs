@@ -90,6 +90,23 @@ fn clearing_search_restores_expansion_without_rebuilding_the_index() {
     assert!(Arc::ptr_eq(&index, &tree.index));
 }
 
+#[test]
+fn request_positions_follow_expansion_and_filtering() {
+    let mut expanded = HashSet::new();
+    let mut tree = SidebarTree::new(Arc::new(TreeIndex::new(&fixture())), &expanded);
+    let path = Path::new("/a/b/one.yml");
+    assert_eq!(tree.row_position(path), None);
+    tree.toggle(Path::new("/a"), &mut expanded);
+    tree.toggle(Path::new("/a/b"), &mut expanded);
+    assert_eq!(tree.row_position(path), Some(2));
+    tree.show_matches(tree.index.matching_rows("Three"));
+    assert_eq!(tree.row_position(path), None);
+    assert_eq!(tree.row_position(Path::new("/three.yml")), Some(0));
+    tree.show_expanded(&expanded);
+    assert_eq!(tree.row_position(path), Some(2));
+    assert_eq!(tree.row_position(Path::new("/missing.yml")), None);
+}
+
 fn large_fixture() -> Vec<Item> {
     (0..100)
         .map(|group| {

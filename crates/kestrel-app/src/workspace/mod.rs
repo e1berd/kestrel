@@ -16,7 +16,7 @@ use futures::StreamExt as _;
 use futures::channel::mpsc;
 use gpui::{
     AnyElement, Context, Entity, InteractiveElement as _, IntoElement, ParentElement as _, Render, Styled as _, Subscription, Window,
-    actions, div,
+    actions, div, rems,
 };
 use gpui_component::{ActiveTheme as _, TitleBar, h_flex, v_flex};
 
@@ -171,7 +171,7 @@ impl Render for Workspace {
             .on_action(cx.listener(|workspace, _: &OpenCommandPalette, window, cx| command_palette::open(workspace, window, cx)))
             .bg(appearance::palette(cx).surface)
             .text_color(cx.theme().foreground)
-            .child(TitleBar::new().child(self.render_title(cx)))
+            .child(TitleBar::new().h(rems(3.2)).min_h(dp(48.)).child(self.render_title(cx)))
             .child(
                 h_flex()
                     .flex_1()

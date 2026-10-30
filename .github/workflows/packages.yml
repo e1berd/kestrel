@@ -1,0 +1,39 @@
+name: Packages
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build deb and AppImage on Ubuntu 22.04
+        run: bash packaging/linux/container.sh
+      - name: Check installation on Ubuntu, Debian and Arch
+        run: bash packaging/linux/verify.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: kestrel-linux-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+  macos:
+    runs-on: [self-hosted, macOS, kestrel]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build Apple Silicon, Intel and universal DMGs in the macOS VM
+        shell: bash
+        run: |
+          source "$HOME/.cargo/env"
+          bash packaging/macos/build.sh
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: kestrel-macos
+          path: dist/*
+          if-no-files-found: error
