@@ -2,8 +2,8 @@ use std::path::{Path, PathBuf};
 
 use gpui::prelude::FluentBuilder as _;
 use gpui::{
-    AnyElement, App, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _, SharedString,
-    StatefulInteractiveElement as _, Styled as _, Window, div, rems,
+    AnyElement, App, AppContext as _, ClickEvent, Context, ElementId, InteractiveElement as _, IntoElement, ParentElement as _,
+    SharedString, StatefulInteractiveElement as _, Styled as _, Window, div, rems,
 };
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::Input;
@@ -13,8 +13,9 @@ use gpui_kit_assets::IconName;
 use volley_core::Item;
 
 use super::ProjectView;
+use super::dragging::TreeDrag;
 use crate::appearance::{self, dp};
-use crate::ui::{ReportUnlessGone as _, eyebrow, method_badge};
+use crate::ui::{ReportUnlessGone as _, method_badge};
 
 struct Row {
     path: PathBuf,
@@ -49,13 +50,13 @@ impl ProjectView {
                     .child(Input::new(&self.filter).prefix(Icon::new(IconName::Search).small().text_color(palette.faint)).cleanable(true)),
             )
             .child(
-                div()
-                    .id("tree")
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .pb_4()
-                    .child(v_flex().gap(dp(1.)).children(rows.into_iter().map(|row| self.render_row(row, active_path.as_deref(), cx)))),
+                div().id("tree").flex_1().min_h_0().overflow_y_scroll().pb_4().child(
+                    v_flex()
+                        .min_h_full()
+                        .gap(dp(1.))
+                        .children(rows.into_iter().map(|row| self.render_row(row, active_path.as_deref(), cx)))
+                        .child(self.render_root_drop_zone(cx)),
+                ),
             )
             .into_any_element()
     }
@@ -80,7 +81,7 @@ impl ProjectView {
             .px(dp(6.))
             .gap(dp(2.))
             .items_center()
-            .child(eyebrow("Requests", cx))
+            .child(self.render_collection_drop_label(cx))
             .child(div().flex_1())
             .child(
                 icon_button("add-request", IconName::Plus).on_click(cx.listener(|view, _, window, cx| view.new_request(None, window, cx))),
@@ -147,8 +148,10 @@ impl ProjectView {
         };
         let view = cx.entity().downgrade();
         let menu_path = path.clone();
+        let drag = TreeDrag { root: self.root(cx), path: path.clone(), name: row.name.clone(), method: row.method.clone() };
         h_flex()
             .id(ElementId::Name(SharedString::from(format!("row-{}", row.path.display()))))
+            .relative()
             .w_full()
             .h(rems(2.0))
             .pl(dp(indent))
@@ -166,6 +169,8 @@ impl ProjectView {
             .when(is_folder && row.count > 0, |el| {
                 el.child(div().text_size(rems(0.72)).text_color(palette.faint).child(row.count.to_string()))
             })
+            .on_drag(drag, |drag, _, _, cx| cx.new(|_| drag.clone()))
+            .when(cx.has_active_drag(), |element| element.child(self.render_drop_zones(&row.path, is_folder, cx)))
             .on_click(cx.listener(move |view, _: &ClickEvent, window, cx| {
                 if is_folder {
                     view.toggle_folder(&path, cx);

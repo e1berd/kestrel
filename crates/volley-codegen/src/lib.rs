@@ -1,22 +1,37 @@
 mod build;
+mod collections;
 mod naming;
+mod plugins;
+mod publishing;
 mod route;
 mod security;
+mod services;
 mod typescript;
 mod writing;
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use serde::Serialize;
 use volley_core::Collection;
-use volley_core::transfer::{Progress, Unit};
+use volley_core::transfer::Progress;
 
-pub use writing::generate_file;
+pub use collections::CollectionOptions;
+pub use plugins::{CodegenPlugin, Generator};
+pub use security::Authentication;
+pub use writing::generate_to;
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct OutputOptions {
+    pub single_file: bool,
+    pub archive: bool,
+}
 
 #[derive(Debug, Clone)]
 pub struct Generated {
-    pub source: String,
+    pub files: BTreeMap<PathBuf, String>,
+    pub entrypoint: PathBuf,
     pub requests: usize,
     pub methods: Vec<String>,
     pub warnings: Vec<String>,
@@ -34,7 +49,8 @@ pub struct Operation {
     pub path_parameters: Vec<Parameter>,
     pub query_parameters: Vec<String>,
     pub body: Option<String>,
-    pub(crate) transport: Transport,
+    pub collection: Option<CollectionOptions>,
+    pub transport: Transport,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -45,15 +61,19 @@ pub struct Parameter {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Transport {
-    method: String,
-    origin: String,
-    path: String,
-    path_parameters: Vec<Parameter>,
-    query: Vec<(String, String)>,
-    headers: BTreeMap<String, String>,
-    body_kind: String,
-    auth: Option<security::Authentication>,
+pub struct Transport {
+    pub id: String,
+    pub service: String,
+    pub method: String,
+    pub origin: String,
+    pub path: String,
+    pub path_parameters: Vec<Parameter>,
+    pub query: Vec<(String, String)>,
+    pub headers: BTreeMap<String, String>,
+    pub sensitive_headers: Vec<String>,
+    pub sensitive_query: Vec<String>,
+    pub body_kind: String,
+    pub auth: Option<Authentication>,
 }
 
 pub fn resources(collection: &Collection, progress: &Progress) -> Result<(Resource, Vec<String>)> {
@@ -61,8 +81,6 @@ pub fn resources(collection: &Collection, progress: &Progress) -> Result<(Resour
 }
 
 pub fn generate(collection: &Collection, progress: &Progress) -> Result<Generated> {
-    let (resources, warnings) = resources(collection, progress)?;
-    progress.start("Generating TypeScript client", None, Unit::Requests)?;
-    let (source, methods) = typescript::generate(&resources, progress)?;
-    Ok(Generated { source, requests: methods.len(), methods, warnings })
+    Generator::new().generate(collection, progress)
 }
+mod archive;

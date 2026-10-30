@@ -48,6 +48,7 @@ fn imported_requests_execute_against_a_local_http_server() {
                 assert!(received.body.is_empty());
             }
             "QUERY" => {
+                assert_eq!(received.headers["content-type"], "application/json");
                 let body: Json = serde_json::from_slice(&received.body).unwrap();
                 assert_eq!(body["origin"], "ATL");
                 assert_eq!(body["destination"], "LHR");

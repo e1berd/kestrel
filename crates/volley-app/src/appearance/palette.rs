@@ -153,7 +153,7 @@ pub struct MethodColors {
 impl MethodColors {
     pub fn of(&self, method: &str) -> Hsla {
         match method {
-            "GET" => self.get,
+            "GET" | "QUERY" => self.get,
             "POST" => self.post,
             "PUT" => self.put,
             "PATCH" => self.patch,

@@ -1,9 +1,13 @@
 use std::path::PathBuf;
 
-use volley_codegen::{generate, generate_file};
+use volley_codegen::{Generated, OutputOptions, generate, generate_to};
 use volley_core::format::{Auth, AuthConfig, Body, Defaults, KeyValue, RequestFile};
 use volley_core::transfer::Progress;
 use volley_core::{Collection, Document};
+
+fn source(generated: &Generated) -> String {
+    generated.files.values().map(String::as_str).collect()
+}
 
 struct Fixture {
     directory: PathBuf,
@@ -65,10 +69,10 @@ fn google_style_methods_follow_url_resources_and_encode_typed_path_arguments() {
             "users.update"
         ]
     );
-    assert!(generated.source.contains("\"userId\": string | number"));
-    assert!(generated.source.contains("\"messageId\": string | number"));
-    assert!(generated.source.contains("\"path\":\"/api/v1/users/{user_id}:archive\""));
-    assert_eq!(generated.source, fixture.generated().source);
+    assert!(source(&generated).contains("\"userId\": string | number"));
+    assert!(source(&generated).contains("\"messageId\": string | number"));
+    assert!(source(&generated).contains("\"path\":\"/api/v1/users/{user_id}:archive\""));
+    assert_eq!(generated.files, fixture.generated().files);
 }
 
 #[test]
@@ -132,13 +136,14 @@ fn inherited_headers_and_auth_are_preserved_without_credentials_or_environment_v
     std::fs::write(root.join(".env"), "DOTENV_SECRET=literal-dotenv-secret\n").unwrap();
     fixture.collection.reload().unwrap();
     let generated = fixture.generated();
-    assert!(generated.source.contains("\"x-scope\":\"folder\""));
-    assert!(generated.source.contains("\"x-request\":\"request\""));
-    assert!(generated.source.contains("{{headers.cookie}}"));
-    assert!(generated.source.contains("{{query.access_token}}"));
-    assert!(generated.source.contains("{{headers.x-private}}"));
-    assert!(generated.source.contains("{{query.opaque}}"));
-    assert!(!generated.source.contains("literal-"));
+    assert!(source(&generated).contains("\"x-scope\":\"folder\""));
+    assert!(source(&generated).contains("\"x-request\":\"request\""));
+    assert!(!source(&generated).contains("{{headers.cookie}}"));
+    assert!(generated.warnings.iter().any(|warning| warning.contains("Cookie headers are omitted")));
+    assert!(source(&generated).contains("{{query.access_token}}"));
+    assert!(source(&generated).contains("{{headers.x-private}}"));
+    assert!(source(&generated).contains("{{query.opaque}}"));
+    assert!(!source(&generated).contains("literal-"));
 }
 
 #[test]
@@ -151,7 +156,7 @@ fn query_parameters_bodies_and_disabled_fields_are_emitted() {
     http.params.push(KeyValue::new("page_size", "10"));
     http.params.push(KeyValue { disabled: true, ..KeyValue::new("disabled_query", "not-emitted") });
     request.doc.save().unwrap();
-    let source = fixture.generated().source;
+    let source = source(&fixture.generated());
     assert!(source.contains("body: JsonValue"));
     assert!(source.contains("\"page_size\"?: QueryValue"));
     assert!(!source.contains("disabled_query"));
@@ -160,12 +165,85 @@ fn query_parameters_bodies_and_disabled_fields_are_emitted() {
 }
 
 #[test]
+fn query_method_keeps_its_body_and_url_parameters_separate() {
+    for method in ["QUERY", "query"] {
+        let mut fixture = Fixture::new();
+        fixture.add("GET", "{{baseUrl}}/users");
+        let path = fixture.add(method, "{{baseUrl}}/users?limit=10");
+        let request = fixture.collection.request_mut(&path).unwrap();
+        let http = request.doc.data.http.as_mut().unwrap();
+        http.body = Some(Body::text("json", "{\"filter\": \"never-embed-query-body\"}"));
+        http.params.push(KeyValue::new("offset", "0"));
+        request.doc.save().unwrap();
+        let original = std::fs::read(&path).unwrap();
+        let generated = fixture.generated();
+        assert_eq!(generated.methods, ["users.list", "users.query"]);
+        assert!(source(&generated).contains("Object.assign(<Response = unknown>(params: { query?:"));
+        assert!(source(&generated).contains("\"limit\"?: QueryValue; \"offset\"?: QueryValue }; body: JsonValue"));
+        assert!(source(&generated).contains("\"method\":\"QUERY\""));
+        assert!(source(&generated).contains("[\"limit\",\"10\"],[\"offset\",\"0\"]"));
+        assert!(source(&generated).contains("\"bodyKind\":\"json\""));
+        assert!(!source(&generated).contains("never-embed-query-body"));
+        assert_eq!(std::fs::read(&path).unwrap(), original);
+    }
+}
+
+#[test]
 fn paths_keep_trailing_and_repeated_slashes() {
     let mut fixture = Fixture::new();
     fixture.add("GET", "https://example.com//users/:user_id/");
     let generated = fixture.generated();
     assert_eq!(generated.methods, ["users.get"]);
-    assert!(generated.source.contains("\"path\":\"//users/{user_id}/\""));
+    assert!(source(&generated).contains("\"path\":\"//users/{user_id}/\""));
+}
+
+#[test]
+fn collection_contracts_follow_operations_and_allow_explicit_singletons_and_queries() {
+    let mut fixture = Fixture::new();
+    fixture.add("GET", "{{baseUrl}}/users?page_token=start");
+    fixture.add("GET", "{{baseUrl}}/users/:user_id");
+    let query = fixture.add("QUERY", "{{baseUrl}}/users");
+    fixture.collection.request_mut(&query).unwrap().doc.data.extra.insert(
+        "extensions".into(),
+        serde_yaml_ng::from_str("kestrel:\n  codegen:\n    collection:\n      items: data.users\n      nextPageToken: pagination.next\n      pageToken: cursor\n").unwrap(),
+    );
+    fixture.collection.request_mut(&query).unwrap().doc.save().unwrap();
+    let profile = fixture.add("GET", "{{baseUrl}}/profile");
+    fixture
+        .collection
+        .request_mut(&profile)
+        .unwrap()
+        .doc
+        .data
+        .extra
+        .insert("extensions".into(), serde_yaml_ng::from_str("kestrel:\n  codegen:\n    method: get\n    collection: false\n").unwrap());
+    let (resources, _) = volley_codegen::resources(&fixture.collection, &Progress::default()).unwrap();
+    let users = &resources.resources["users"];
+    assert_eq!(users.methods["list"].collection.as_ref().unwrap().page_token.as_deref(), Some("page_token"));
+    assert!(users.methods["get"].collection.is_none());
+    let query = users.methods["query"].collection.as_ref().unwrap();
+    assert_eq!(query.items.as_deref(), Some("data.users"));
+    assert_eq!(query.next_page_token.as_deref(), Some("pagination.next"));
+    assert_eq!(query.page_token.as_deref(), Some("cursor"));
+    assert!(resources.resources["profile"].methods["get"].collection.is_none());
+}
+
+#[test]
+fn invalid_collection_metadata_is_reported_before_publishing() {
+    for settings in ["[]", "null", "{unknown: true}", "{items: data..users}", "{nextPageToken: ''}", "{pageToken: ''}"] {
+        let mut fixture = Fixture::new();
+        let path = fixture.add("GET", "/users");
+        fixture
+            .collection
+            .request_mut(&path)
+            .unwrap()
+            .doc
+            .data
+            .extra
+            .insert("extensions".into(), serde_yaml_ng::from_str(&format!("kestrel:\n  codegen:\n    collection: {settings}\n")).unwrap());
+        let error = generate(&fixture.collection, &Progress::default()).unwrap_err();
+        assert!(format!("{error:#}").contains("codegen.collection"));
+    }
 }
 
 #[test]
@@ -195,16 +273,17 @@ fn writing_is_atomic_respects_cancellation_and_preserves_collection_bytes() {
     let path = fixture.add("GET", "/users/:user_id");
     let original = std::fs::read(&path).unwrap();
     let destination = fixture.directory.join("client.ts");
+    let options = OutputOptions { single_file: true, archive: false };
     let progress = Progress::default();
-    let generated = generate_file(&fixture.collection.root, &destination, false, &progress).unwrap();
+    let generated = generate_to(&fixture.collection.root, &destination, options, false, &progress).unwrap();
     assert!(progress.snapshot().finished);
-    assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.source);
+    assert_eq!(std::fs::read_to_string(&destination).unwrap(), source(&generated));
     assert_eq!(std::fs::read(&path).unwrap(), original);
-    assert!(generate_file(&fixture.collection.root, &destination, false, &Progress::default()).is_err());
-    assert!(generate_file(&fixture.collection.root, &fixture.directory.join("request.yml"), true, &Progress::default()).is_err());
+    assert!(generate_to(&fixture.collection.root, &destination, options, false, &Progress::default()).is_err());
+    assert!(generate_to(&fixture.collection.root, &fixture.directory.join("request.yml"), options, true, &Progress::default()).is_err());
     let cancelled = Progress::default();
     cancelled.cancel();
-    assert!(generate_file(&fixture.collection.root, &destination, true, &cancelled).is_err());
-    assert_eq!(std::fs::read_to_string(&destination).unwrap(), generated.source);
+    assert!(generate_to(&fixture.collection.root, &destination, options, true, &cancelled).is_err());
+    assert_eq!(std::fs::read_to_string(&destination).unwrap(), source(&generated));
     assert_eq!(std::fs::read_dir(&fixture.directory).unwrap().count(), 2);
 }

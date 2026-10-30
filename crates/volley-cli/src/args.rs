@@ -23,6 +23,10 @@ pub(super) enum Command {
         #[arg(long, default_value = "typescript", value_parser = ["typescript"])]
         language: String,
         #[arg(long)]
+        single_file: bool,
+        #[arg(long)]
+        archive: bool,
+        #[arg(long)]
         overwrite: bool,
     },
     Export {

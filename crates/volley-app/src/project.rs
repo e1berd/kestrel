@@ -34,6 +34,7 @@ pub struct Project {
     pub load_error: Option<String>,
     pub git: Option<GitStatus>,
     pub last_sync: Option<SystemTime>,
+    pub tree_move_pending: bool,
     _watcher: Option<notify::RecommendedWatcher>,
     _watch_task: Option<Task<()>>,
 }
@@ -60,6 +61,7 @@ impl Project {
                 load_error: None,
                 git: None,
                 last_sync: None,
+                tree_move_pending: false,
                 _watcher: None,
                 _watch_task: None,
             };
@@ -82,6 +84,9 @@ impl Project {
     }
 
     pub fn reload(&mut self, cx: &mut Context<Self>) {
+        if self.tree_move_pending {
+            return;
+        }
         match self.collection.reload() {
             Ok(()) => self.load_error = None,
             Err(e) => self.load_error = Some(format!("{e:#}")),
@@ -89,6 +94,13 @@ impl Project {
         if self.env.as_ref().is_some_and(|name| self.collection.environment(name).is_none()) {
             self.env = None;
         }
+        self.refresh_git(cx);
+        cx.emit(ProjectEvent::Reloaded);
+        cx.notify();
+    }
+
+    pub fn finish_tree_move(&mut self, cx: &mut Context<Self>) {
+        self.tree_move_pending = false;
         self.refresh_git(cx);
         cx.emit(ProjectEvent::Reloaded);
         cx.notify();

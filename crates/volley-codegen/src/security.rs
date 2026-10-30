@@ -6,14 +6,14 @@ use volley_core::Plan;
 use volley_core::format::Auth;
 
 #[derive(Debug, Clone, Serialize)]
-pub(crate) struct Authentication {
-    kind: String,
-    key: String,
-    placement: String,
-    prefix: String,
-    token: String,
-    username: String,
-    password: String,
+pub struct Authentication {
+    pub kind: String,
+    pub key: String,
+    pub placement: String,
+    pub prefix: String,
+    pub token: String,
+    pub username: String,
+    pub password: String,
 }
 
 pub(crate) fn authentication(plan: &Plan, warnings: &mut Vec<String>) -> Result<Option<Authentication>> {
@@ -72,6 +72,7 @@ pub(crate) fn headers(plan: &Plan) -> BTreeMap<String, String> {
         .flat_map(|(_, defaults)| &defaults.headers)
         .chain(&http.headers)
         .filter(|header| header.enabled())
+        .filter(|header| !header.name.eq_ignore_ascii_case("cookie") && !header.name.eq_ignore_ascii_case("set-cookie"))
         .filter(|header| auth_header.as_ref().is_none_or(|name| !header.name.eq_ignore_ascii_case(name)))
         .map(|header| {
             let name =

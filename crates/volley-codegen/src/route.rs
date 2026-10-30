@@ -64,7 +64,7 @@ pub(crate) fn parse(input: &str) -> Result<Route> {
             }
             let name = identifier(wire);
             validate(&name)?;
-            if matches!(name.as_str(), "body" | "query") {
+            if matches!(name.as_str(), "body" | "query" | "search") {
                 bail!("path parameter `{wire}` conflicts with an SDK argument; rename it in the request");
             }
             if parameters.iter().any(|parameter: &Parameter| parameter.name == name && parameter.wire != wire) {

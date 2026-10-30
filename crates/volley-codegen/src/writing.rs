@@ -1,45 +1,113 @@
-use std::fs::OpenOptions;
-use std::io::Write as _;
+use std::fs::{File, OpenOptions};
 use std::path::Path;
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{Result, bail};
 use volley_core::Collection;
 use volley_core::report::ReportExt as _;
 use volley_core::transfer::{Progress, Unit};
 
-use crate::Generated;
+use crate::{Generated, Generator, OutputOptions, archive, publishing};
 
-pub fn generate_file(source: &Path, destination: &Path, overwrite: bool, progress: &Progress) -> Result<Generated> {
-    if destination.extension().is_none_or(|extension| extension != "ts") {
-        bail!("the TypeScript SDK destination must end in .ts");
-    }
-    if destination.exists() && !overwrite {
-        bail!("{} already exists; use --overwrite to replace it", destination.display());
-    }
+pub fn generate_to(source: &Path, destination: &Path, options: OutputOptions, overwrite: bool, progress: &Progress) -> Result<Generated> {
+    Generator::new().output(options).generate_to(source, destination, overwrite, progress)
+}
+
+pub(crate) fn generate_with(
+    generator: &Generator,
+    source: &Path,
+    destination: &Path,
+    overwrite: bool,
+    progress: &Progress,
+) -> Result<Generated> {
+    let options = generator.output;
+    validate_destination(destination, options, overwrite, progress)?;
     progress.start("Reading saved collection", None, Unit::Files)?;
     let collection = Collection::open_with_progress(source, progress)?;
-    let generated = crate::generate(&collection, progress)?;
+    let generated = generator.generate(&collection, progress)?;
+    for path in generated.files.keys() {
+        publishing::validate_path(path)?;
+    }
     let parent = destination.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or(Path::new("."));
     std::fs::create_dir_all(parent)?;
     let temporary = parent.join(format!(".kestrel-codegen-{}", uuid::Uuid::new_v4()));
+    let directory = !options.archive && !options.single_file;
     let result = (|| {
-        progress.start("Writing TypeScript SDK", Some(generated.source.len() as u64), Unit::Bytes)?;
-        let mut file = OpenOptions::new().write(true).create_new(true).open(&temporary).context("create SDK temporary file")?;
-        file.write_all(generated.source.as_bytes())?;
-        file.sync_all()?;
-        drop(file);
-        progress.advance(generated.source.len() as u64)?;
-        progress.check()?;
-        if overwrite {
-            std::fs::rename(&temporary, destination)?;
+        let bytes = generated.files.values().map(|source| source.len() as u64).sum();
+        progress.start(if options.archive { "Packing SDK as ZIP" } else { "Writing SDK files" }, Some(bytes), Unit::Bytes)?;
+        if options.archive {
+            archive::write(&temporary, &generated, options.single_file, progress)?;
+        } else if options.single_file {
+            let source = &generated.files[&generated.entrypoint];
+            write_source(&temporary, source, progress)?;
         } else {
-            std::fs::hard_link(&temporary, destination)?;
+            std::fs::create_dir(&temporary)?;
+            for (path, source) in &generated.files {
+                write_source(&temporary.join(path), source, progress)?;
+            }
+            publishing::write_manifest(&temporary, &generated)?;
         }
-        progress.published("SDK generated", generated.requests as u64, Unit::Requests);
+        progress.check()?;
+        if directory {
+            publishing::directory(&temporary, destination, overwrite, progress)?;
+        } else {
+            publishing::file(&temporary, destination, overwrite)?;
+        }
+        progress.published("SDK generated", generated.files.len() as u64, Unit::Files);
         Ok(generated)
     })();
     if temporary.exists() {
-        std::fs::remove_file(&temporary).report_err("remove SDK temporary file");
+        if directory {
+            std::fs::remove_dir_all(&temporary).report_err("remove SDK staging directory");
+        } else {
+            std::fs::remove_file(&temporary).report_err("remove SDK temporary file");
+        }
     }
     result
+}
+
+fn validate_destination(destination: &Path, options: OutputOptions, overwrite: bool, progress: &Progress) -> Result<()> {
+    progress.check()?;
+    if !options.single_file && !options.archive {
+        if destination.extension().is_some_and(|extension| extension == "ts" || extension == "zip") {
+            bail!("the default SDK output is a directory; use --single-file for .ts or --archive for .zip");
+        }
+        publishing::check_directory(destination, overwrite, progress)?;
+    } else {
+        let extension = if options.archive { "zip" } else { "ts" };
+        if destination.extension().is_none_or(|actual| actual != extension) {
+            bail!("the SDK destination must end in .{extension}");
+        }
+        match std::fs::symlink_metadata(destination) {
+            Ok(metadata) if !metadata.is_file() || metadata.file_type().is_symlink() => {
+                bail!("the SDK file destination must be a regular file")
+            }
+            Ok(_) if !overwrite => bail!("{} already exists; use --overwrite to replace it", destination.display()),
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+fn write_source(path: &Path, source: &str, progress: &Progress) -> Result<()> {
+    std::fs::create_dir_all(path.parent().expect("a generated file has a parent"))?;
+    let file = OpenOptions::new().write(true).create_new(true).open(path)?;
+    let mut writer = progress.writer(file);
+    write_chunks(&mut writer, source, progress)?;
+    writer.get_ref().sync_all()?;
+    Ok(())
+}
+
+pub(crate) fn write_chunks(writer: &mut impl std::io::Write, source: &str, progress: &Progress) -> Result<()> {
+    for chunk in source.as_bytes().chunks(64 * 1024) {
+        progress.check()?;
+        writer.write_all(chunk)?;
+        progress.advance(chunk.len() as u64)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn create_file(path: &Path) -> Result<File> {
+    Ok(OpenOptions::new().read(true).write(true).create_new(true).open(path)?)
 }

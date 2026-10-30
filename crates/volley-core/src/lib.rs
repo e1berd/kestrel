@@ -1,4 +1,5 @@
 pub mod collection;
+pub mod collection_move;
 pub mod document;
 pub mod format;
 pub mod http;

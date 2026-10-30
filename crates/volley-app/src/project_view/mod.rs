@@ -1,3 +1,4 @@
+mod dragging;
 mod empty_state;
 mod openapi_sync;
 mod sidebar;

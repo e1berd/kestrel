@@ -35,6 +35,7 @@ clap = { version = "4", features = ["derive"] }
 dirs = "6"
 notify = "8"
 yaml-rust2 = { version = "0.13.0", default-features = false }
+zip = { version = "9.1.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [profile.dev]
 # GPUI is slow unoptimised; our own code stays quick to build.

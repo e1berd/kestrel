@@ -1,4 +1,4 @@
-use gpui::{AppContext as _, Context, Window};
+use gpui::{AppContext as _, Context, PathPromptOptions, Window};
 use volley_core::report::report_error;
 
 use super::CodegenDialog;
@@ -6,7 +6,11 @@ use crate::ui::ReportUnlessGone as _;
 
 impl CodegenDialog {
     pub(super) fn choose_destination(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let suggested = "client.ts";
+        if !self.output.single_file && !self.output.archive {
+            self.choose_directory(window, cx);
+            return;
+        }
+        let suggested = if self.output.archive { "sdk.zip" } else { "client.ts" };
         let picked = cx.prompt_for_new_path(self.source.parent().unwrap_or(&self.source), Some(suggested));
         cx.spawn_in(window, async move |view, cx| match picked.await {
             Ok(Ok(Some(destination))) => view
@@ -24,6 +28,32 @@ impl CodegenDialog {
         .detach();
     }
 
+    fn choose_directory(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let picked = cx.prompt_for_paths(PathPromptOptions {
+            files: false,
+            directories: true,
+            multiple: false,
+            prompt: Some("Choose an empty folder or an existing generated SDK".into()),
+        });
+        cx.spawn_in(window, async move |view, cx| match picked.await {
+            Ok(Ok(Some(paths))) => {
+                if let Some(destination) = paths.into_iter().next() {
+                    view.update(cx, |view, cx| {
+                        view.destination = Some(destination);
+                        view.error = None;
+                        view.report = None;
+                        cx.notify();
+                    })
+                    .report_unless_gone("choose SDK directory");
+                }
+            }
+            Ok(Ok(None)) => {}
+            Ok(Err(error)) => view.update(cx, |view, cx| view.fail(error, cx)).report_unless_gone("show SDK directory picker error"),
+            Err(error) => report_error("choose SDK directory", error),
+        })
+        .detach();
+    }
+
     pub(super) fn generate(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.busy {
             return;
@@ -35,10 +65,12 @@ impl CodegenDialog {
         self.report = None;
         let source = self.source.clone();
         let progress = self.progress.clone();
+        let options = self.output;
         self.watch_progress(window, cx);
         cx.notify();
         cx.spawn_in(window, async move |view, cx| {
-            let result = cx.background_spawn(async move { volley_codegen::generate_file(&source, &destination, true, &progress) }).await;
+            let result =
+                cx.background_spawn(async move { volley_codegen::generate_to(&source, &destination, options, true, &progress) }).await;
             view.update(cx, |view, cx| {
                 view.busy = false;
                 match result {

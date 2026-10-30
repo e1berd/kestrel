@@ -14,7 +14,7 @@ Code name: **volley**.
 - **Scripts and tests**: before-request and after-response scripts and `test()` / `expect()` with Bruno's API (`bru`, `req`, `res`) in QuickJS, `require('jsonwebtoken')` included.
 - **Imports**: OpenAPI 3.0 / 3.1 / 3.2 and Swagger 2.0 in JSON or YAML, and native Apidog JSON exports. Preview requests, folders and conversion warnings before choosing an empty destination folder.
 - **Exports**: OpenAPI 3.0 / 3.1 / 3.2, Swagger 2.0 and Apidog, with streaming file handling and actual stage progress in both transfer dialogs.
-- **SDK generation**: standalone TypeScript clients with resource methods such as `client.users.list()`, `.insert()`, `.update()` and `.delete()`, directly from saved requests.
+- **SDK generation**: standalone TypeScript clients with resource classes and async iterable collections: `Array.fromAsync(client.users.list())`, `.insert()`, `.update()` and `.delete()`, directly from saved requests.
 - **OpenAPI sync**: sync an imported collection as often as the spec changes; your edits (bodies, values, scripts, auth) survive the sync.
 - **Several projects open at once**, each with its own tabs; switch from the rail on the left or with Ctrl+Shift+[ / ].
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
@@ -72,10 +72,10 @@ kestrel-cli sync path/to/collection
 Choose **Generate SDK…** from the collection menu or command palette, or run:
 
 ```bash
-kestrel-cli codegen path/to/collection --out sdk/client.ts
+kestrel-cli codegen path/to/collection --out sdk
 ```
 
-The generated TypeScript SDK uses fetch without runtime dependencies. It infers nested resources from URLs, requires path arguments, supports query parameters, bodies and inherited authentication, and accepts credentials and variables at runtime. Use `--overwrite` to replace an SDK. See the [SDK guide](crates/volley-codegen/README.md) for API examples, explicit names, authentication and limitations.
+The generated TypeScript SDK uses fetch without runtime dependencies. By default it writes a module directory with resource classes and lazy `Collection<T>` async iterables. Use `--single-file` to bundle it, `--archive` to package it as ZIP, or both; both options default to off and are also available in the desktop dialog. It supports nested resources, pagination, request bodies and inherited authentication, with credentials and variables supplied at runtime. Use `--overwrite` to replace a generated SDK. See the [SDK guide](crates/volley-codegen/README.md) for layouts, API examples, authentication and limitations.
 
 ## Shortcuts
 

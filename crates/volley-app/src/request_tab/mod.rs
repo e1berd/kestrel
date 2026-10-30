@@ -9,6 +9,7 @@ use volley_core::{Document, Outcome};
 use crate::kv_table::{KvChanged, KvTable};
 use crate::project::{Project, ProjectEvent};
 mod build;
+mod relocation;
 mod response;
 mod response_sections;
 mod sections;
@@ -17,7 +18,7 @@ mod url_bar;
 mod variable_marks;
 mod variable_popup;
 
-const METHODS: [&str; 7] = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
+const METHODS: [&str; 8] = ["GET", "QUERY", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"];
 const BODY_KINDS: [(&str, &str); 7] = [
     ("none", "None"),
     ("json", "JSON"),
@@ -251,6 +252,13 @@ impl RequestTab {
     }
 
     pub fn save(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.project.read(cx).tree_move_pending {
+            window.push_notification(
+                gpui_component::notification::Notification::info("Moving collection items; save again in a moment."),
+                cx,
+            );
+            return;
+        }
         self.doc.data = self.build_file(cx);
         match self.doc.save() {
             Ok(()) => {

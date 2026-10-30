@@ -20,7 +20,9 @@ use args::{Cli, Command};
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let result = match cli.command {
-        Command::Codegen { collection, out, language: _, overwrite } => codegen::generate(&collection, &out, overwrite).map(|_| true),
+        Command::Codegen { collection, out, language: _, single_file, archive, overwrite } => {
+            codegen::generate(&collection, &out, volley_codegen::OutputOptions { single_file, archive }, overwrite).map(|_| true)
+        }
         Command::Export { collection, out, format, encoding, overwrite } => {
             importing::export(&collection, &out, &format, &encoding, overwrite).map(|_| true)
         }

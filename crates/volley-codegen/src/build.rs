@@ -4,7 +4,7 @@ use volley_core::transfer::{Progress, Unit};
 use volley_core::{Collection, Plan};
 
 use crate::naming::validate;
-use crate::{Operation, Resource, Transport, route, security};
+use crate::{Operation, Resource, Transport, collections, route, security, services};
 
 pub(crate) fn resources(collection: &Collection, progress: &Progress) -> Result<(Resource, Vec<String>)> {
     let requests = collection.requests();
@@ -34,6 +34,7 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
     let http = plan.file.http.as_ref().expect("an HTTP request");
     let route = route::parse(&http.url)?;
     let method = if http.method.is_empty() { "GET".into() } else { http.method.to_ascii_uppercase() };
+    let is_collection = method == "GET" && !route.member && route.action.is_none();
     if !method.bytes().all(|byte| byte.is_ascii_uppercase() || byte == b'-') {
         bail!("invalid HTTP method");
     }
@@ -41,6 +42,11 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
         bail!("fetch does not support the {method} method");
     }
     let overrides = plan.file.extra.get("extensions").and_then(|value| value.get("kestrel")).and_then(|value| value.get("codegen"));
+    let service = match overrides.and_then(|value| value.get("service")) {
+        Some(value) => value.as_str().context("codegen.service must be a service name")?.to_string(),
+        None => services::name(&route.origin)?,
+    };
+    validate(&service)?;
     let resource_path = match overrides.and_then(|value| value.get("resource")) {
         Some(value) => value.as_str().context("codegen.resource must be a dotted resource path")?.split('.').map(str::to_string).collect(),
         None => route.resources,
@@ -79,6 +85,16 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
     if !plan.file.scripts().is_empty() || plan.chain.iter().any(|(_, defaults)| !defaults.scripts.is_empty()) {
         warnings.push("Bruno scripts and tests are not executed in generated SDKs; reproduce their behavior in your application.".into());
     }
+    if plan
+        .chain
+        .iter()
+        .flat_map(|(_, defaults)| &defaults.headers)
+        .chain(&http.headers)
+        .any(|header| header.enabled() && (header.name.eq_ignore_ascii_case("cookie") || header.name.eq_ignore_ascii_case("set-cookie")))
+    {
+        warnings
+            .push("Saved Cookie headers are omitted; configure per-service credentials and Cookie Store for session/CSRF cookies.".into());
+    }
     if !http.extra.is_empty() || plan.file.settings.as_ref().is_some_and(|settings| settings.timeout.is_some_and(|timeout| timeout > 0)) {
         warnings.push("Kestrel transport settings are not embedded; configure fetch and RequestOptions.signal in your application.".into());
     }
@@ -100,25 +116,45 @@ fn add(root: &mut Resource, plan: &Plan, warnings: &mut Vec<String>) -> Result<(
     let mut query_parameters: Vec<_> = query.iter().map(|(name, _)| name.clone()).collect();
     query_parameters.sort();
     query_parameters.dedup();
+    let collection =
+        collections::options(plan, is_collection, resource_path.last().context("an SDK resource must have a name")?, &query_parameters)?;
     let transport = Transport {
+        id: format!("{}.{name}", resource_path.join(".")),
+        service,
         method,
         origin: route.origin,
         path: route.path,
         path_parameters: route.parameters.clone(),
         query,
         headers: security::headers(plan),
+        sensitive_headers: plan
+            .chain
+            .iter()
+            .flat_map(|(_, defaults)| &defaults.headers)
+            .chain(&http.headers)
+            .filter(|header| header.enabled() && (header.is_secret() || security::sensitive(&header.name)))
+            .map(|header| header.name.clone())
+            .collect(),
+        sensitive_query: http
+            .params
+            .iter()
+            .filter(|parameter| parameter.enabled() && parameter.kind.as_deref() != Some("path") && parameter.is_secret())
+            .map(|parameter| parameter.name.clone())
+            .collect(),
         body_kind: body_kind.into(),
         auth: security::authentication(plan, warnings)?,
     };
-    node.methods
-        .insert(name, Operation { request: plan.name.clone(), path_parameters: route.parameters, query_parameters, body, transport });
+    node.methods.insert(
+        name,
+        Operation { request: plan.name.clone(), path_parameters: route.parameters, query_parameters, body, collection, transport },
+    );
     Ok(())
 }
 
 fn body_type(body: Option<&Body>) -> Result<Option<String>> {
     Ok(match body.map(|body| body.kind.as_str()) {
         None | Some("none") => None,
-        Some("json") => Some("JsonValue".into()),
+        Some("json") => Some("JsonValue | BodyInit".into()),
         Some("graphql") => Some("{ query: string; variables?: Record<string, JsonValue>; operationName?: string }".into()),
         Some("form-urlencoded") => Some("URLSearchParams | Record<string, string>".into()),
         Some("multipart-form") => Some("FormData".into()),
