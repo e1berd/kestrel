@@ -1,4 +1,4 @@
-use gpui::{AppContext as _, Context, Entity, IntoElement, ParentElement as _, Styled as _, Window, div};
+use gpui::{AppContext as _, Context, Entity, IntoElement, ParentElement as _, Styled as _, Window};
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::{EditorState, InputEvent};
 use gpui_component::menu::{DropdownMenu as _, PopupMenuItem};
@@ -28,6 +28,7 @@ impl RequestTab {
         let docs = self.docs.clone();
         let editor = cx.new(|cx| RabbitMqTab::new(project, path, config, variables, docs, window, cx));
         self._subscriptions.push(cx.subscribe(&editor, |tab, _, _: &RabbitMqChanged, cx| tab.changed(cx)));
+        self._subscriptions.push(cx.observe(&editor, |_, _, cx| cx.notify()));
         self.rabbitmq = Some(editor);
     }
 
@@ -114,11 +115,12 @@ impl RequestTab {
     pub(super) fn render_rabbitmq_header(&self, cx: &mut Context<Self>) -> impl IntoElement {
         h_flex()
             .px(dp(16.))
-            .pt(dp(10.))
-            .pb(dp(6.))
+            .pt(dp(14.))
+            .pb(dp(8.))
+            .items_center()
             .gap(dp(8.))
             .child(self.render_api_picker(cx))
-            .child(div().flex_1())
+            .children(self.rabbitmq.as_ref().map(|tab| tab.update(cx, |tab, cx| tab.render_connection_bar(cx))))
             .child(self.render_save_button(cx))
     }
 }

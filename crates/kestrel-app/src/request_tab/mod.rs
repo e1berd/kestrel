@@ -10,6 +10,8 @@ use crate::kv_table::{KvChanged, KvTable};
 use crate::project::{Project, ProjectEvent};
 mod api;
 mod build;
+mod graphql;
+mod graphql_syntax;
 use api::ApiKind;
 mod path_params;
 mod persistence;
@@ -99,6 +101,8 @@ pub struct RequestTab {
     body: Entity<EditorState>,
     body_fields: Entity<KvTable>,
     graphql_vars: Entity<EditorState>,
+    graphql_section: graphql::Section,
+    graphql_error: Option<String>,
     auth_mode: String,
     auth_inputs: Vec<(&'static str, Entity<InputState>)>,
     scripts: Vec<(&'static str, Entity<EditorState>)>,
@@ -169,6 +173,8 @@ impl RequestTab {
             body,
             body_fields,
             graphql_vars,
+            graphql_section: graphql::Section::Query,
+            graphql_error: None,
             auth_mode: auth.mode().to_string(),
             auth_inputs: Vec::new(),
             scripts,

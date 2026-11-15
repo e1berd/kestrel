@@ -9,6 +9,7 @@ use super::{RequestTab, TabEvent, code_editor, language_of};
 
 impl RequestTab {
     pub(super) fn changed(&mut self, cx: &mut Context<Self>) {
+        self.graphql_error = None;
         let dirty = self.build_file(cx) != self.saved_file;
         if dirty != self.dirty {
             self.dirty = dirty;

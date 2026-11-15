@@ -7,6 +7,7 @@ use gpui::{
     AnyElement, Context, Entity, HighlightStyle, Hsla, InteractiveElement as _, IntoElement, MouseButton, MouseUpEvent, ParentElement as _,
     Styled as _, Window, div, point,
 };
+use gpui_component::ActiveTheme as _;
 use gpui_component::input::{EditorState, InlineToken, InlineTokenClickEvent, Input, TextDecoration};
 use kestrel_core::Plan;
 use kestrel_core::report::ReportExt as _;
@@ -106,14 +107,21 @@ impl RequestTab {
         let editors = [self.body.clone(), self.graphql_vars.clone()];
         self.editor_marks.retain(|(id, _)| editors.iter().any(|editor| editor.entity_id() == *id));
         for editor in editors {
-            let marks: Vec<TextDecoration> = placeholders(&editor.read(cx).value())
-                .into_iter()
-                .map(|(range, name)| {
-                    let color = VariableState::of(&name, scope.as_ref()).color(&palette);
-                    let style = HighlightStyle { color: Some(color), background_color: Some(palette.tint(color)), ..Default::default() };
-                    TextDecoration::new(range, style)
-                })
-                .collect();
+            let text = editor.read(cx).value().to_string();
+            let mut marks = Vec::new();
+            if self.body_kind == "graphql" && editor.entity_id() == self.body.entity_id() {
+                let syntax = &cx.theme().highlight_theme.style.syntax;
+                marks.extend(
+                    super::graphql_syntax::tokens(&text)
+                        .into_iter()
+                        .filter_map(|token| syntax.style(token.capture).map(|style| TextDecoration::new(token.range, style))),
+                );
+            }
+            marks.extend(placeholders(&text).into_iter().map(|(range, name)| {
+                let color = VariableState::of(&name, scope.as_ref()).color(&palette);
+                let style = HighlightStyle { color: Some(color), background_color: Some(palette.tint(color)), ..Default::default() };
+                TextDecoration::new(range, style)
+            }));
             match self.editor_marks.iter().find(|(id, _)| *id == editor.entity_id()) {
                 Some((_, collection)) => collection.set(marks, cx),
                 None => {

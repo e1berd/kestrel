@@ -64,17 +64,7 @@ impl RequestTab {
         let content: AnyElement = match self.body_kind.as_str() {
             "none" => hint("This request sends no body.", cx).into_any_element(),
             "form-urlencoded" | "multipart-form" => scroll("fields-scroll", self.body_fields.clone().into_any_element()),
-            "graphql" => {
-                let query = self.render_code_with_variables(&self.body, cx);
-                let variables = self.render_code_with_variables(&self.graphql_vars, cx);
-                v_flex()
-                    .size_full()
-                    .gap_2()
-                    .child(div().h(gpui::relative(0.62)).min_h_0().child(query))
-                    .child(hint("Variables", cx))
-                    .child(div().flex_1().min_h_0().child(variables))
-                    .into_any_element()
-            }
+            "graphql" => return self.render_graphql(cx),
             _ => self.render_code_with_variables(&self.body, cx),
         };
         let tab = cx.entity().downgrade();
@@ -96,7 +86,11 @@ impl RequestTab {
             .into_any_element()
     }
 
-    fn render_code_with_variables(&self, editor: &gpui::Entity<gpui_component::input::EditorState>, cx: &mut Context<Self>) -> AnyElement {
+    pub(super) fn render_code_with_variables(
+        &self,
+        editor: &gpui::Entity<gpui_component::input::EditorState>,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
         let code = code_box(Editor::new(editor).bordered(false).h_full(), cx).into_any_element();
         self.with_clickable_variables(editor, code, cx)
     }

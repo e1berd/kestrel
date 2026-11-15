@@ -13,45 +13,40 @@ use crate::appearance::{self, MONO_FONT, dp};
 use crate::ui::{ReportUnlessGone as _, chip, code_box, hint, labelled_input, scroll, section_tab, section_tab_strip, segmented};
 
 impl RabbitMqTab {
-    fn render_connection_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn render_connection_bar(&self, cx: &mut Context<Self>) -> AnyElement {
         let palette = appearance::palette(cx);
         let active = self.client.is_some();
-        v_flex()
+        h_flex()
+            .flex_1()
+            .min_w_0()
+            .h(rems(2.8))
+            .p(dp(4.))
+            .gap(dp(8.))
+            .rounded(dp(12.))
+            .border_1()
+            .border_color(palette.border)
+            .bg(palette.raised)
+            .shadow(appearance::elevation::lifted(cx))
+            .child(div().px(dp(10.)).text_sm().text_color(palette.muted).child("Broker"))
+            .child(div().flex_1().min_w_0().font_family(MONO_FONT).child(Input::new(self.input("url")).appearance(false).disabled(active)))
+            .child(
+                Button::new("rmq-connect")
+                    .label(if active { "Disconnect" } else { "Connect" })
+                    .when(!active, |button| button.primary())
+                    .on_click(cx.listener(|tab, _, window, cx| tab.toggle_connection(window, cx))),
+            )
+            .into_any_element()
+    }
+
+    fn render_connection_status(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let palette = appearance::palette(cx);
+        h_flex()
             .px(dp(16.))
             .pb(dp(12.))
             .gap(dp(8.))
-            .child(
-                h_flex()
-                    .h(rems(2.8))
-                    .p(dp(4.))
-                    .gap(dp(8.))
-                    .rounded(dp(12.))
-                    .border_1()
-                    .border_color(palette.border)
-                    .bg(palette.raised)
-                    .shadow(appearance::elevation::lifted(cx))
-                    .child(div().px(dp(10.)).text_sm().text_color(palette.muted).child("Broker"))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .font_family(MONO_FONT)
-                            .child(Input::new(self.input("url")).appearance(false).disabled(active)),
-                    )
-                    .child(
-                        Button::new("rmq-connect")
-                            .label(if active { "Disconnect" } else { "Connect" })
-                            .when(!active, |button| button.primary())
-                            .on_click(cx.listener(|tab, _, window, cx| tab.toggle_connection(window, cx))),
-                    ),
-            )
-            .child(
-                h_flex()
-                    .flex_wrap()
-                    .gap(dp(8.))
-                    .child(chip(self.status.clone(), if self.connected { palette.success } else { palette.muted }, cx))
-                    .child(hint("AMQP 0-9-1 · Manual acknowledgements", cx)),
-            )
+            .items_center()
+            .child(chip(self.status.clone(), if self.connected { palette.success } else { palette.muted }, cx))
+            .child(hint("AMQP 0-9-1 · Manual acknowledgements", cx))
     }
 
     fn render_operations(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -196,7 +191,7 @@ impl Render for RabbitMqTab {
         let palette = appearance::palette(cx);
         v_flex()
             .size_full()
-            .child(self.render_connection_bar(cx))
+            .child(self.render_connection_status(cx))
             .when_some(self.error.clone(), |element, error| {
                 element.child(
                     div()
