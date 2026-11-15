@@ -38,6 +38,12 @@ impl Request {
     }
 
     pub fn method(&self) -> String {
+        if self.doc.data.rabbitmq.is_some() {
+            return "RMQ".into();
+        }
+        if self.doc.data.http.as_ref().and_then(|http| http.body.as_ref()).is_some_and(|body| body.kind == "graphql") {
+            return "GQL".into();
+        }
         self.doc.data.http.as_ref().map(|h| h.method.to_uppercase()).unwrap_or_else(|| "GET".into())
     }
 }

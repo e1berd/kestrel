@@ -278,6 +278,8 @@ pub struct RequestFile {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub http: Option<Http>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rabbitmq: Option<crate::rabbitmq::RabbitMq>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime: Option<Runtime>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settings: Option<Settings>,

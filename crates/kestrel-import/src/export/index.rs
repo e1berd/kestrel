@@ -76,7 +76,14 @@ impl Index {
         for (file, folders, defaults) in files {
             progress.check()?;
             let request: RequestFile = serde_yaml_ng::from_reader(BufReader::new(progress.reader(File::open(&file)?)))?;
-            let Some(http) = &request.http else { continue };
+            let Some(http) = &request.http else {
+                if request.rabbitmq.is_some() {
+                    index
+                        .warnings
+                        .push(format!("RabbitMQ operation {} is not supported by this export format and was skipped.", request.info.name));
+                }
+                continue;
+            };
             if !request.scripts().is_empty() {
                 index.warnings.push("Scripts and tests are not exported because their runtime APIs differ.".into());
             }

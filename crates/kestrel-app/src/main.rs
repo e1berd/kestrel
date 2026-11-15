@@ -6,6 +6,7 @@ macro_rules! primary {
     };
 }
 
+mod api_kind;
 mod appearance;
 mod assets;
 mod codegen_dialog;
@@ -19,6 +20,7 @@ mod kv_table;
 mod prefs;
 mod project;
 mod project_view;
+mod rabbitmq_tab;
 mod request_tab;
 mod settings;
 mod transfer_progress;

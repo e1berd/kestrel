@@ -147,6 +147,7 @@ fn run(path: &Path, env: Option<&str>, vars: Vec<(String, String)>, bail_early: 
                 "url": outcome.sent.as_ref().map(|s| s.url.clone()),
                 "status": outcome.response.as_ref().map(|r| r.status),
                 "ms": outcome.response.as_ref().map(|r| r.elapsed.as_millis() as u64),
+                "rabbitmq": outcome.rabbitmq,
                 "error": outcome.error,
                 "scriptError": outcome.script_error,
                 "skipped": outcome.skipped,
@@ -191,6 +192,18 @@ fn collect(items: &[Item], out: &mut Vec<PathBuf>) {
 }
 
 fn print_outcome(plan: &Plan, relative: &str, outcome: &kestrel_core::Outcome, verbose: bool) {
+    if plan.file.rabbitmq.is_some() {
+        let status = match (&outcome.rabbitmq, &outcome.error) {
+            (_, Some(error)) => paint(error, RED),
+            (Some(message), _) => paint(message.state.label(), GREEN),
+            (None, _) => paint("Queue empty", DIM),
+        };
+        println!("{} {}  {}", paint("RMQ    ", BOLD), relative, status);
+        if verbose && let Some(message) = &outcome.rabbitmq {
+            println!("{}", String::from_utf8_lossy(&message.body));
+        }
+        return;
+    }
     let method = outcome.sent.as_ref().map(|s| s.method.clone()).unwrap_or_else(|| plan.file.http().method.to_uppercase());
     let status = match (&outcome.response, outcome.skipped) {
         (_, true) => paint("skipped", DIM),

@@ -8,7 +8,9 @@ use kestrel_core::{Document, Outcome};
 
 use crate::kv_table::{KvChanged, KvTable};
 use crate::project::{Project, ProjectEvent};
+mod api;
 mod build;
+use api::ApiKind;
 mod path_params;
 mod persistence;
 mod relocation;
@@ -85,6 +87,9 @@ pub struct RequestTab {
     saved_file: RequestFile,
     pub dirty: bool,
     pub changed_on_disk: bool,
+    api: ApiKind,
+    http_draft: Option<api::HttpDraft>,
+    rabbitmq: Option<Entity<crate::rabbitmq_tab::RabbitMqTab>>,
     method: String,
     url: Entity<InputState>,
     params: Entity<KvTable>,
@@ -152,6 +157,9 @@ impl RequestTab {
             saved_file: file.clone(),
             dirty: false,
             changed_on_disk: false,
+            api: ApiKind::of(&file),
+            http_draft: None,
+            rabbitmq: None,
             method: if http.method.is_empty() { "GET".into() } else { http.method.to_uppercase() },
             url,
             params,
@@ -182,6 +190,9 @@ impl RequestTab {
         };
         tab.build_auth_inputs(auth.config(), window, cx);
         tab.tokenize_url(window, cx);
+        if tab.api == ApiKind::RabbitMq {
+            tab.load_rabbitmq(window, cx);
+        }
         tab.saved_file = tab.build_file(cx);
 
         let mut subscriptions = vec![
@@ -212,7 +223,7 @@ impl RequestTab {
                 }
             }));
         }
-        tab._subscriptions = subscriptions;
+        tab._subscriptions.extend(subscriptions);
         tab.update_preview(cx);
         Some(tab)
     }
@@ -222,7 +233,13 @@ impl RequestTab {
     }
 
     pub fn method(&self) -> &str {
-        &self.method
+        if self.api == ApiKind::RabbitMq {
+            "RMQ"
+        } else if self.api == ApiKind::GraphQl {
+            "GQL"
+        } else {
+            &self.method
+        }
     }
 
     fn build_auth_inputs(&mut self, config: Option<&AuthConfig>, window: &mut Window, cx: &mut Context<Self>) {
@@ -262,6 +279,9 @@ impl RequestTab {
         let was_text = !matches!(self.body_kind.as_str(), "none" | "form-urlencoded" | "multipart-form");
         let text = if was_text { self.body.read(cx).value().to_string() } else { String::new() };
         self.body_kind = kind.into();
+        if self.api != ApiKind::RabbitMq {
+            self.api = if kind == "graphql" { ApiKind::GraphQl } else { ApiKind::Rest };
+        }
         self.body = code_editor(language_of(kind), text, window, cx);
         let body = self.body.clone();
         self._subscriptions.push(cx.subscribe(&body, |tab, _, event: &InputEvent, cx| {
@@ -293,13 +313,25 @@ fn code_editor<T: 'static>(language: &'static str, text: String, window: &mut Wi
 impl Render for RequestTab {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = crate::appearance::palette(cx);
-        v_flex().size_full().children(self.render_variable_popup(cx)).child(self.render_url_bar(cx)).child(
-            div().flex_1().min_h_0().border_t_1().border_color(palette.border_soft).child(
-                h_resizable("request-response").child(resizable_panel().child(self.render_request(window, cx))).child(
-                    resizable_panel()
-                        .child(div().size_full().border_l_1().border_color(palette.border_soft).child(self.render_response(cx))),
+        if self.api == ApiKind::RabbitMq {
+            return v_flex()
+                .size_full()
+                .child(self.render_rabbitmq_header(cx))
+                .child(div().flex_1().min_h_0().children(self.rabbitmq.clone()))
+                .into_any_element();
+        }
+        v_flex()
+            .size_full()
+            .children(self.render_variable_popup(cx))
+            .child(self.render_url_bar(cx))
+            .child(
+                div().flex_1().min_h_0().border_t_1().border_color(palette.border_soft).child(
+                    h_resizable("request-response").child(resizable_panel().child(self.render_request(window, cx))).child(
+                        resizable_panel()
+                            .child(div().size_full().border_l_1().border_color(palette.border_soft).child(self.render_response(cx))),
+                    ),
                 ),
-            ),
-        )
+            )
+            .into_any_element()
     }
 }

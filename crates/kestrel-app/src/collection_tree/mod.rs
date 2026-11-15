@@ -33,7 +33,17 @@ impl TreeIndex {
                 let name = item.name();
                 let (method, url) = match item {
                     Item::Folder(_) => (None, ""),
-                    Item::Request(request) => (Some(request.method()), request.doc.data.http.as_ref().map_or("", |http| &http.url)),
+                    Item::Request(request) => (
+                        Some(request.method()),
+                        request
+                            .doc
+                            .data
+                            .http
+                            .as_ref()
+                            .map(|http| http.url.as_str())
+                            .or_else(|| request.doc.data.rabbitmq.as_ref().map(|config| config.url.as_str()))
+                            .unwrap_or(""),
+                    ),
                 };
                 let path: Arc<Path> = item.path().into();
                 index.paths.insert(path.clone(), node);

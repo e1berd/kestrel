@@ -40,7 +40,8 @@ pub fn list(collection: Collection) -> Result<Value> {
                 "path": relative(&collection, &request.doc.path)?,
                 "name": request.name(),
                 "method": request.method(),
-                "url": request.doc.data.http.as_ref().map(|http| &http.url),
+                "type": request.doc.data.info.kind,
+                "url": request.doc.data.http.as_ref().map(|http| &http.url).or_else(|| request.doc.data.rabbitmq.as_ref().map(|config| &config.url)),
             }))
         })
         .collect::<Result<Vec<_>>>()?;
@@ -97,10 +98,15 @@ pub fn update(mut collection: Collection, arguments: UpdateRequest) -> Result<Va
     let mut data = serde_json::to_value(&request.doc.data)?;
     merge_patch(&mut data, Value::Object(arguments.patch));
     let data: RequestFile = serde_json::from_value(data)?;
-    let http = data.http.as_ref().context("request must contain http")?;
-    validate_method(&http.method)?;
-    ensure!(!http.url.trim().is_empty(), "request URL must not be empty");
-    ensure!(data.info.kind.is_empty() || data.info.kind == "http", "only HTTP requests are supported");
+    if let Some(config) = &data.rabbitmq {
+        ensure!(data.http.is_none() && data.info.kind == "rabbitmq", "RabbitMQ operations must have type rabbitmq and no http section");
+        config.validate_saved_connection()?;
+    } else {
+        let http = data.http.as_ref().context("request must contain http or rabbitmq")?;
+        validate_method(&http.method)?;
+        ensure!(!http.url.trim().is_empty(), "request URL must not be empty");
+        ensure!(data.info.kind.is_empty() || data.info.kind == "http", "unsupported request type");
+    }
     if request.doc.data != data {
         request.doc.data = data;
         request.doc.save()?;

@@ -10,6 +10,8 @@ Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the Open
 
 - **File-based collections**: one YAML file per request, `folder.yml` per folder, `environments/*.yml`, secrets in `.env` (ignored by git).
 - **Requests**: params (path and query), headers, JSON / text / XML / form / multipart / GraphQL bodies, auth inherited from folders and the collection: bearer, basic, API key, OAuth 2.0 (authorization code with PKCE, client credentials, password).
+- **API selector**: switch between REST, GraphQL and RabbitMQ in the request toolbar. REST and GraphQL keep separate body drafts while the tab is open.
+- **RabbitMQ**: native AMQP 0-9-1 with TLS, publisher confirms and unroutable-message reporting; fetch individual messages or subscribe to an existing queue, inspect payloads and properties, then acknowledge, requeue or reject deliveries.
 - **Variables**: `{{name}}` from the collection, environments, folders, requests and scripts; `{{process.env.NAME}}` from `.env`; `{{$randomUUID}}`, `{{$timestamp}}` and friends.
 - **Scripts and tests**: before-request and after-response scripts and `test()` / `expect()` with Bruno's API (`bru`, `req`, `res`) in QuickJS, `require('jsonwebtoken')` included.
 - **Imports**: OpenAPI 3.0 / 3.1 / 3.2 and Swagger 2.0 in JSON or YAML, and native Apidog JSON exports. Preview requests, folders and conversion warnings before choosing an empty destination folder.
@@ -20,6 +22,16 @@ Kestrel opens collections made by [Bruno](https://www.usebruno.com/) 3 (the Open
 - **Appearance**: light, dark or system theme; colour schemes as small JSON files (make your own); interface zoom, text size and code font size separately; a low-vision mode.
 - **CLI** for terminals and CI: `kestrelcli run`, `import`, `export`, `codegen`, `sync`.
 - **MCP server**: let an AI client inspect and edit saved requests, select environments, send requests and run collections with scripts and tests.
+
+## RabbitMQ
+
+Create a request and select **RabbitMQ** in the API menu. Enter an `amqp://` or `amqps://` broker URL; set the virtual host, username and password variable in **Connection**. Store the password in the collection's ignored `.env` file as `RABBITMQ_PASSWORD` and keep `{{process.env.RABBITMQ_PASSWORD}}` in the password field. Connection settings, message fields and payloads support collection, environment and request variables.
+
+Connect, then use **Publish** to send a message to an existing exchange. An empty exchange selects RabbitMQ's default exchange; use the queue name as the routing key. **Receive** can fetch one message or listen with a bounded prefetch. Select a received message in the journal to **Ack**, **Requeue** or **Reject** it. Disconnecting, switching API types or closing the tab releases unacknowledged deliveries. Message previews are limited to 256 KB; publications send the entire payload.
+
+RabbitMQ files use Kestrel's `info.type: rabbitmq` and `rabbitmq` section. They are an extension to OpenCollection and cannot be executed by Bruno. Existing HTTP files retain their original format. SDK generation and HTTP exports skip RabbitMQ operations with a warning.
+
+CLI and MCP runs execute the saved publish or fetch operation. A fetched message is requeued after inspection; interactive acknowledgements and subscriptions are available in the app. HTTP scripts are not executed by the RabbitMQ editor, and CLI/MCP runs reject RabbitMQ operations with inherited or saved HTTP scripts.
 
 ## Build
 

@@ -31,6 +31,8 @@ gpui_kit_assets::icon_assets!(
 );
 
 pub const LOGO: &str = "brand/kestrel.svg";
+pub const GRAPHQL_LOGO: &str = "api/graphql.svg";
+pub const RABBITMQ_LOGO: &str = "api/rabbitmq.svg";
 pub const WINDOW_ICON_PNG: &[u8] = include_bytes!("../../../packaging/linux/icons/kestrel-128.png");
 
 pub struct AppAssets;
@@ -39,6 +41,12 @@ impl AssetSource for AppAssets {
     fn load(&self, path: &str) -> gpui::Result<Option<Cow<'static, [u8]>>> {
         if path == LOGO {
             return Ok(Some(Cow::Borrowed(include_bytes!("../assets/brand/kestrel.svg"))));
+        }
+        if path == GRAPHQL_LOGO {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/api/graphql.svg"))));
+        }
+        if path == RABBITMQ_LOGO {
+            return Ok(Some(Cow::Borrowed(include_bytes!("../assets/api/rabbitmq.svg"))));
         }
         if let Some(bytes) = ExtraIcons.load(path)? {
             return Ok(Some(bytes));
@@ -49,6 +57,7 @@ impl AssetSource for AppAssets {
     fn list(&self, path: &str) -> gpui::Result<Vec<SharedString>> {
         let mut paths = gpui_kit_assets::Assets.list(path)?;
         paths.extend(ExtraIcons.list(path)?);
+        paths.extend([GRAPHQL_LOGO, RABBITMQ_LOGO].into_iter().filter(|asset| asset.starts_with(path)).map(SharedString::from));
         paths.sort();
         paths.dedup();
         Ok(paths)

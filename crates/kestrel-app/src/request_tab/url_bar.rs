@@ -24,6 +24,7 @@ impl RequestTab {
                 h_flex()
                     .gap(dp(8.))
                     .items_center()
+                    .child(self.render_api_picker(cx))
                     .child(
                         h_flex()
                             .flex_1()
@@ -60,7 +61,7 @@ impl RequestTab {
             .when(self.changed_on_disk, |el| el.child(self.render_disk_conflict(cx)))
     }
 
-    fn render_save_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    pub(super) fn render_save_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let palette = appearance::palette(cx);
         h_flex()
             .id("save")

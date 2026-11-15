@@ -3,20 +3,30 @@ use kestrel_core::Plan;
 use kestrel_core::format::{Auth, AuthConfig, Body, Docs, KeyValue, RequestFile, Runtime, Script};
 use serde_yaml_ng::Value as Yaml;
 
-use super::RequestTab;
+use super::{RequestTab, api::ApiKind};
 
 impl RequestTab {
     pub fn build_file(&self, cx: &App) -> RequestFile {
         let mut file = self.doc.data.clone();
-        let original = file.http.clone().unwrap_or_default();
-        let mut http = original.clone();
-        http.method = self.method.clone();
-        http.url = self.url.read(cx).value().to_string();
-        http.params = keep_if_same(&original.params, self.params.read(cx).items(cx));
-        http.headers = keep_if_same(&original.headers, self.headers.read(cx).items(cx));
-        http.body = self.build_body(original.body.as_ref(), cx);
-        http.auth = self.build_auth(original.auth.as_ref(), cx);
-        file.http = Some(http);
+        if self.api == ApiKind::RabbitMq {
+            file.info.kind = "rabbitmq".into();
+            file.http = None;
+            file.rabbitmq = self.rabbitmq.as_ref().map(|tab| tab.read(cx).config(cx));
+        } else {
+            file.rabbitmq = None;
+            if file.info.kind == "rabbitmq" {
+                file.info.kind = "http".into();
+            }
+            let original = file.http.clone().unwrap_or_default();
+            let mut http = original.clone();
+            http.method = self.method.clone();
+            http.url = self.url.read(cx).value().to_string();
+            http.params = keep_if_same(&original.params, self.params.read(cx).items(cx));
+            http.headers = keep_if_same(&original.headers, self.headers.read(cx).items(cx));
+            http.body = self.build_body(original.body.as_ref(), cx);
+            http.auth = self.build_auth(original.auth.as_ref(), cx);
+            file.http = Some(http);
+        }
 
         let scripts = self.build_scripts(file.scripts(), cx);
         let variables = keep_if_same(file.variables(), self.vars.read(cx).items(cx));
@@ -119,6 +129,10 @@ impl RequestTab {
     }
 
     pub(super) fn update_preview(&mut self, cx: &mut Context<Self>) {
+        if self.api == ApiKind::RabbitMq {
+            self.missing_path_params.clear();
+            return;
+        }
         self.refresh_variable_marks(cx);
         let file = self.build_file(cx);
         let project = self.project.read(cx);

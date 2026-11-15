@@ -44,7 +44,7 @@ pub(crate) fn read_dir_tracked(dir: &Path, ignored: &HashSet<String>, progress: 
             if let Some(progress) = progress {
                 progress.advance(1)?;
             }
-            if doc.data.info.kind.is_empty() || doc.data.info.kind == "http" || doc.data.http.is_some() {
+            if doc.data.info.kind.is_empty() || doc.data.info.kind == "http" || doc.data.http.is_some() || doc.data.rabbitmq.is_some() {
                 items.push(Item::Request(Request { doc }));
             }
         }

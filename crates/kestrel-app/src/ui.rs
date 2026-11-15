@@ -10,10 +10,16 @@ use gpui_component::input::{Input, InputState};
 use gpui_component::{ActiveTheme as _, h_flex, v_flex};
 use kestrel_core::report::report_error;
 
+use crate::api_kind::ApiKind;
 use crate::appearance::{self, MONO_FONT, dp};
 
 pub fn method_color(method: &str, cx: &App) -> Hsla {
-    appearance::palette(cx).methods.of(method)
+    let palette = appearance::palette(cx);
+    match method {
+        "RMQ" => palette.warning,
+        "GQL" => palette.accent,
+        _ => palette.methods.of(method),
+    }
 }
 
 fn short_method(method: &str) -> String {
@@ -25,6 +31,9 @@ fn short_method(method: &str) -> String {
 }
 
 pub fn method_badge(method: &str, cx: &App) -> impl IntoElement {
+    if let Some(api) = ApiKind::from_method(method) {
+        return div().flex_none().w(rems(2.2)).flex().items_center().child(api.icon(cx).size(dp(14.)));
+    }
     div()
         .flex_none()
         .w(rems(2.2))
@@ -36,6 +45,9 @@ pub fn method_badge(method: &str, cx: &App) -> impl IntoElement {
 }
 
 pub fn method_label(method: &str, cx: &App) -> impl IntoElement + use<> {
+    if let Some(api) = ApiKind::from_method(method) {
+        return div().flex_none().flex().items_center().child(api.icon(cx).size(dp(14.)));
+    }
     div()
         .flex_none()
         .font_family(MONO_FONT)

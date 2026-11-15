@@ -9,6 +9,10 @@ impl RequestTab {
         if let Ok(relative) = self.path.strip_prefix(old) {
             self.path = new.join(relative);
             self.doc.path = self.path.clone();
+            if let Some(tab) = &self.rabbitmq {
+                let path = self.path.clone();
+                tab.update(cx, |tab, cx| tab.relocate(path, cx));
+            }
         }
         let fresh = self.project.read(cx).collection.request(&self.path).map(|request| request.doc.clone());
         if let Some(fresh) = fresh {

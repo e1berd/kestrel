@@ -107,6 +107,7 @@ fn outcome_value(path: &str, outcome: &Outcome) -> Value {
     json!({
         "path": path,
         "passed": outcome.passed(),
+        "rabbitmq": outcome.rabbitmq,
         "skipped": outcome.skipped,
         "error": outcome.error,
         "script_error": outcome.script_error,

@@ -31,7 +31,15 @@ impl RequestTab {
             return;
         }
         let Some(promotion) = self.promote_pending_variables(mode, window, cx) else { return };
-        self.doc.data = self.build_file(cx);
+        let file = self.build_file(cx);
+        if let Some(config) = &file.rabbitmq
+            && let Err(error) = config.validate_saved_connection()
+        {
+            report_error("save a RabbitMQ operation", &error);
+            window.push_notification(gpui_component::notification::Notification::error(format!("{error:#}")), cx);
+            return;
+        }
+        self.doc.data = file;
         match self.doc.save() {
             Ok(()) => {
                 self.saved_file = self.doc.data.clone();
@@ -82,6 +90,13 @@ impl RequestTab {
 
     fn load_inputs(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let file = self.doc.data.clone();
+        self.http_draft = None;
+        self.api = super::api::ApiKind::of(&file);
+        if self.api == super::api::ApiKind::RabbitMq {
+            self.load_rabbitmq(window, cx);
+        } else if let Some(tab) = self.rabbitmq.take() {
+            tab.update(cx, |tab, cx| tab.disconnect(cx));
+        }
         let http = file.http();
         self.method = if http.method.is_empty() { "GET".into() } else { http.method.to_uppercase() };
         self.url.update(cx, |input, cx| input.set_value(http.url.clone(), window, cx));

@@ -8,6 +8,7 @@ mod loading;
 pub mod oauth2;
 pub mod outcome;
 pub mod plan;
+pub mod rabbitmq;
 pub mod report;
 mod request_builder;
 pub mod script;
@@ -19,20 +20,23 @@ pub mod yaml;
 
 pub use collection::{Collection, Environment, Folder, Item, Request};
 pub use document::Document;
-pub use http::send;
 pub use outcome::{Outcome, Response, SentRequest};
 pub use plan::Plan;
 pub use session::Session;
 pub use variable_home::VariableHome;
+
+pub async fn send(plan: &Plan, session: &Session, interact: &dyn oauth2::Interact) -> Outcome {
+    if plan.file.rabbitmq.is_some() { rabbitmq::send(plan, session).await } else { http::send(plan, session, interact).await }
+}
 
 pub fn runtime() -> &'static tokio::runtime::Runtime {
     static RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
     RUNTIME.get_or_init(|| {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
-            .thread_name("kestrel-http")
+            .thread_name("kestrel-runtime")
             .enable_all()
             .build()
-            .expect("the HTTP runtime")
+            .expect("the async runtime")
     })
 }

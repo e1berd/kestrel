@@ -21,6 +21,7 @@ uuid.workspace = true
 chrono.workspace = true
 rand.workspace = true
 dotenvy.workspace = true
+lapin = { version = "4.12.3", default-features = false, features = ["tokio", "rustls", "rustls-native-certs", "rustls--ring"] }
 rquickjs = "0.14"
 jsonwebtoken = { version = "11", default-features = false, features = ["use_pem", "rust_crypto"] }
 sha2 = "0.10"

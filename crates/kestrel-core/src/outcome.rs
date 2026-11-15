@@ -62,6 +62,7 @@ impl Response {
 }
 #[derive(Debug, Clone, Default)]
 pub struct Outcome {
+    pub rabbitmq: Option<crate::rabbitmq::Message>,
     pub sent: Option<SentRequest>,
     pub response: Option<Response>,
     pub error: Option<String>,

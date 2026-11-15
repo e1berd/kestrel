@@ -6,6 +6,12 @@ use crate::ui::ReportUnlessGone as _;
 
 impl RequestTab {
     pub fn send(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.api == super::api::ApiKind::RabbitMq {
+            if let Some(tab) = &self.rabbitmq {
+                tab.update(cx, |tab, cx| tab.send(window, cx));
+            }
+            return;
+        }
         if self.sending.is_some() {
             return;
         }
