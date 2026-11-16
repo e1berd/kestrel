@@ -8,6 +8,7 @@ use gpui::{
     Styled as _, Window, div, point,
 };
 use gpui_component::ActiveTheme as _;
+use gpui_component::highlighter::SyntaxColors;
 use gpui_component::input::{EditorState, InlineToken, InlineTokenClickEvent, Input, TextDecoration};
 use kestrel_core::Plan;
 use kestrel_core::report::ReportExt as _;
@@ -108,16 +109,13 @@ impl RequestTab {
         self.editor_marks.retain(|(id, _)| editors.iter().any(|editor| editor.entity_id() == *id));
         for editor in editors {
             let text = editor.read(cx).value().to_string();
-            let mut marks = Vec::new();
-            if self.body_kind == "graphql" && editor.entity_id() == self.body.entity_id() {
-                let syntax = &cx.theme().highlight_theme.style.syntax;
-                marks.extend(
-                    super::graphql_syntax::tokens(&text)
-                        .into_iter()
-                        .filter_map(|token| syntax.style(token.capture).map(|style| TextDecoration::new(token.range, style))),
-                );
-            }
-            marks.extend(placeholders(&text).into_iter().map(|(range, name)| {
+            let variables = placeholders(&text);
+            let mut marks = if self.body_kind == "graphql" && editor.entity_id() == self.body.entity_id() {
+                graphql_decorations(&text, &variables, &cx.theme().highlight_theme.style.syntax)
+            } else {
+                Vec::new()
+            };
+            marks.extend(variables.into_iter().map(|(range, name)| {
                 let color = VariableState::of(&name, scope.as_ref()).color(&palette);
                 let style = HighlightStyle { color: Some(color), background_color: Some(palette.tint(color)), ..Default::default() };
                 TextDecoration::new(range, style)
@@ -166,6 +164,24 @@ impl RequestTab {
     }
 }
 
+fn graphql_decorations(text: &str, variables: &[(Range<usize>, String)], syntax: &SyntaxColors) -> Vec<TextDecoration> {
+    let mut decorations = Vec::new();
+    for token in super::graphql_syntax::tokens(text) {
+        let Some(style) = syntax.style(token.capture) else { continue };
+        let mut start = token.range.start;
+        for (variable, _) in variables.iter().filter(|(range, _)| range.start < token.range.end && token.range.start < range.end) {
+            if start < variable.start {
+                decorations.push(TextDecoration::new(start..variable.start, style));
+            }
+            start = start.max(variable.end);
+        }
+        if start < token.range.end {
+            decorations.push(TextDecoration::new(start..token.range.end, style));
+        }
+    }
+    decorations
+}
+
 fn placeholders(text: &str) -> Vec<(Range<usize>, String)> {
     let mut found = Vec::new();
     let mut offset = 0;
@@ -183,11 +199,28 @@ fn placeholders(text: &str) -> Vec<(Range<usize>, String)> {
 
 #[cfg(test)]
 mod tests {
-    use super::placeholders;
+    use gpui_component::highlighter::HighlightTheme;
+
+    use super::{graphql_decorations, placeholders};
 
     #[test]
     fn placeholders_skip_generated_values() {
         let found = placeholders("{{baseUrl}}/users/{{ id }}?r={{$randomUUID}}&q={{");
         assert_eq!(found, vec![(0..11, "baseUrl".to_string()), (18..26, "id".to_string())]);
+    }
+
+    #[test]
+    fn graphql_highlights_use_the_theme_and_leave_template_ranges_to_variable_marks() {
+        let text = "query User($id: ID!) { user(id: $id, name: \"Hello {{name}}!\") { id } }";
+        let variables = placeholders(text);
+        for theme in [HighlightTheme::default_light(), HighlightTheme::default_dark()] {
+            let decorations = graphql_decorations(text, &variables, &theme.style.syntax);
+            assert!(decorations.iter().any(|decoration| decoration.range == (0..5) && decoration.style.color.is_some()));
+            for decoration in &decorations {
+                assert!(variables.iter().all(|(range, _)| decoration.range.end <= range.start || range.end <= decoration.range.start));
+            }
+            let greeting = text.find("\"Hello ").unwrap();
+            assert!(decorations.iter().any(|decoration| decoration.range.start == greeting));
+        }
     }
 }

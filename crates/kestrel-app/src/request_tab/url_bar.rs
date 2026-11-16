@@ -65,6 +65,7 @@ impl RequestTab {
         let palette = appearance::palette(cx);
         h_flex()
             .id("save")
+            .flex_none()
             .h(rems(2.8))
             .px(dp(14.))
             .gap(dp(7.))

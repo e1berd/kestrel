@@ -65,6 +65,9 @@ pub(super) fn variable_names(source: &str) -> Vec<String> {
 }
 
 fn name_end(source: &str, mut offset: usize) -> usize {
+    if !source.as_bytes().get(offset).is_some_and(|character| character.is_ascii_alphabetic() || *character == b'_') {
+        return offset;
+    }
     while offset < source.len() && (source.as_bytes()[offset].is_ascii_alphanumeric() || source.as_bytes()[offset] == b'_') {
         offset += 1;
     }

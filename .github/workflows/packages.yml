@@ -2,18 +2,70 @@ name: Packages
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a new version after all builds pass
+        type: boolean
+        default: false
   push:
+    branches: [main]
     tags: ["v*"]
 
 permissions:
   contents: read
 
+concurrency:
+  group: packages-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  linux:
-    runs-on: ubuntu-22.04
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      publish: ${{ steps.version.outputs.publish }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Build deb and AppImage on Ubuntu 22.04
+      - name: Read the release version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_PUBLISH: ${{ github.event_name != 'workflow_dispatch' || inputs.publish }}
+        run: python3 packaging/release.py prepare
+
+  checks:
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake pkg-config libfontconfig1-dev libfreetype6-dev libssl-dev libudev-dev libvulkan-dev libwayland-dev libxcb1-dev libxkbcommon-x11-dev
+      - name: Install Rust toolchains
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup toolchain install 1.92.0 --profile minimal --component rustfmt --component clippy
+      - name: Check formatting and lint the engine
+        run: |
+          cargo +1.92.0 fmt --all --check
+          cargo +1.92.0 clippy -p kestrel-core -p kestrel-openapi -p kestrel-cli -p kestrel-mcp --all-targets --locked
+      - name: Test the workspace and release validation
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          cargo test --workspace --locked
+          python3 -m unittest discover -s packaging -p 'test_release.py'
+
+  linux:
+    needs: [prepare, checks]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Build DEB and AppImage on Ubuntu 22.04
         run: bash packaging/linux/container.sh
       - name: Check installation on Ubuntu, Debian and Arch
         run: bash packaging/linux/verify.sh
@@ -24,16 +76,55 @@ jobs:
           if-no-files-found: error
 
   macos:
-    runs-on: [self-hosted, macOS, kestrel]
+    needs: [prepare, checks]
+    runs-on: macos-15
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Build Apple Silicon, Intel and universal DMGs in the macOS VM
-        shell: bash
-        run: |
-          source "$HOME/.cargo/env"
-          bash packaging/macos/build.sh
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal
+      - name: Build Apple Silicon, Intel and universal DMGs
+        run: bash packaging/macos/build.sh
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: kestrel-macos
           path: dist/*
           if-no-files-found: error
+
+  windows:
+    needs: [prepare, checks]
+    runs-on: windows-2025
+    timeout-minutes: 120
+    env:
+      CARGO_BUILD_JOBS: "2"
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Install Rust
+        run: rustup toolchain install stable --profile minimal --target x86_64-pc-windows-msvc
+      - name: Build and test the Windows installer and portable archive
+        shell: pwsh
+        run: ./packaging/windows/build.ps1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: kestrel-windows-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, linux, macos, windows]
+    if: needs.prepare.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: kestrel-*
+          path: dist
+          merge-multiple: true
+      - name: Validate all platform packages and publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 packaging/release.py publish dist

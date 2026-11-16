@@ -1,4 +1,4 @@
-use anyhow::{Context as _, Result, ensure};
+use anyhow::Result;
 use gpui::prelude::FluentBuilder as _;
 use gpui::{AnyElement, Context, IntoElement, ParentElement as _, StatefulInteractiveElement as _, Styled as _, Window, div};
 use gpui_component::button::{Button, ButtonVariants as _};
@@ -91,12 +91,7 @@ impl RequestTab {
 }
 
 fn prepare_variables(original: &str, query: &str) -> Result<String> {
-    let value: Value = if original.trim().is_empty() {
-        Value::Object(Map::new())
-    } else {
-        serde_json::from_str(original).context("Variables must be valid JSON")?
-    };
-    ensure!(value.is_object() || value.is_null(), "Variables must be a JSON object");
+    let value = kestrel_core::graphql::parse_variables(original)?;
     let mut variables = match value {
         Value::Object(variables) => variables,
         _ => Map::new(),

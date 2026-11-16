@@ -142,11 +142,22 @@ bash packaging/macos/build.sh
 
 Each DMG contains `Kestrel.app` and an Applications shortcut. The CLI and MCP executables are inside `Kestrel.app/Contents/MacOS/`. Builds use ad-hoc signatures by default; Developer ID signing and notarization are described in the [packaging guide](packaging/README.md#macos-vm).
 
+### Windows x64
+
+Install Rust stable, Visual Studio Build Tools with the C++ workload and Windows SDK, CMake and Inno Setup 6. From PowerShell:
+
+```powershell
+$env:RUSTFLAGS = '-C target-feature=+crt-static'
+./packaging/windows/build.ps1
+```
+
+The build creates a per-user installer and a portable ZIP containing the app, CLI and MCP server. The installer adds a Start menu shortcut and does not need administrator privileges.
+
 ### Build outputs and CI
 
 All packages contain the app, CLI and MCP server. Package versions come from `Cargo.toml`; every artifact has a matching `.sha256` file. Override the output directory with `KESTREL_DIST_DIR` and parallel compilation with `CARGO_BUILD_JOBS` (packaging defaults to 2). Linux container caches are in `target/packaging/`; the macOS VM keeps its Rust build cache in `~/kestrel-build/target`.
 
-The [Packages workflow](.github/workflows/packages.yml) runs on `v*` tags or manual dispatch and uploads the built packages as workflow artifacts. Linux uses Docker; macOS requires a self-hosted runner registered inside the guest with the `macOS` and `kestrel` labels. See the [packaging guide](packaging/README.md) for installation commands, signing options and VM setup details.
+The [Packages workflow](.github/workflows/packages.yml) runs on pushes to `main`, `v*` tags or manual dispatch. After tests pass, hosted runners build Windows, Linux and macOS packages. A new workspace version is published as a GitHub release only after every platform build and checksum validation succeeds. Manual runs build artifacts by default; enable the publish input to release a new version. See the [packaging guide](packaging/README.md) for installation commands, signing options and VM setup details.
 
 ## Use
 

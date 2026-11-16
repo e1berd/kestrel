@@ -4066,7 +4066,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-app"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "dirs 6.0.0",
@@ -4090,7 +4090,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4109,7 +4109,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-codegen"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "kestrel-core",
@@ -4123,7 +4123,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -4150,7 +4150,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-import"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "indexmap",
@@ -4167,7 +4167,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-mcp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -4182,7 +4182,7 @@ dependencies = [
 
 [[package]]
 name = "kestrel-openapi"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "indexmap",

@@ -4,7 +4,6 @@ use anyhow::{Context as _, Result, bail};
 use base64::Engine as _;
 use indexmap::IndexMap;
 use percent_encoding::{AsciiSet, CONTROLS, utf8_percent_encode};
-use serde_json::Value as Json;
 
 use crate::format::{Auth, AuthConfig};
 use crate::oauth2::{self, Interact, Placement};
@@ -133,7 +132,7 @@ pub(crate) async fn build(
         }
         ("graphql", Some(body)) => {
             let (query_text, variables) = body.graphql();
-            let variables: Json = serde_json::from_str(&i(&variables)).unwrap_or(Json::Null);
+            let variables = crate::graphql::parse_variables(&i(&variables))?;
             sent_body = serde_json::to_string_pretty(&serde_json::json!({ "query": i(&query_text), "variables": variables }))?;
             if !has_header(&headers, "content-type") {
                 headers.push(("Content-Type".into(), "application/json".into()));
